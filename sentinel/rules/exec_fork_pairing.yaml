@@ -1,0 +1,65 @@
+id: 7c4f9c41-2a5e-4b8e-a3e0-d1c0a01a0002
+name: Wirken - long-running exec tool call
+description: |
+  Detection 2 (long-running subset). Joins AssistantToolCalls to
+  the matching ToolResult by (SessionId, call_id) and surfaces
+  rows whose duration exceeds 30 seconds. A sibling rule should
+  match on Success == false for failed-exec alerts.
+severity: Medium
+status: Available
+requiredDataConnectors: []
+queryFrequency: PT15M
+queryPeriod: PT1H
+triggerOperator: GreaterThan
+triggerThreshold: 0
+suppressionDuration: PT0M
+suppressionEnabled: false
+tactics:
+  - Execution
+relevantTechniques:
+  - T1059
+query: |
+  let calls =
+    Custom_WirkenSession_CL
+    | where Kind == "assistant_tool_calls"
+    | mv-expand call = parse_json(Event).calls
+    | where tostring(call.name) == "exec"
+    | project
+        CallTime = TimeGenerated,
+        SessionId,
+        CallId = tostring(call.id),
+        Argv = tostring(parse_json(tostring(call.arguments)).command),
+        AgentId = tostring(parse_json(Event).agent_id),
+        AdapterId,
+        SenderId;
+  let results =
+    Custom_WirkenSession_CL
+    | where Kind == "tool_result"
+    | extend body = parse_json(Event)
+    | where tostring(body.tool_name) == "exec"
+    | project
+        ResultTime = TimeGenerated,
+        SessionId,
+        CallId = tostring(body.call_id),
+        Success = tobool(body.success),
+        OutputSize = strlen(tostring(body.output));
+  calls
+  | join kind=inner results on SessionId, CallId
+  | extend DurationMs = datetime_diff('millisecond', ResultTime, CallTime)
+  | where DurationMs > 30000
+  | project
+      TimeGenerated = ResultTime,
+      SessionId,
+      CallId,
+      AgentId,
+      AdapterId,
+      SenderId,
+      Argv,
+      Success,
+      DurationMs,
+      OutputSize
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: SenderId

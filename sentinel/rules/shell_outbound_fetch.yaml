@@ -1,0 +1,66 @@
+id: 7c4f9c41-2a5e-4b8e-a3e0-d1c0a01a0001
+name: Wirken - shell-driven outbound fetch
+description: |
+  Detection 1. Fires when the Wirken agent runs curl / wget /
+  msiexec / Invoke-WebRequest / iwr / bitsadmin / certutil
+  through the exec tool. Reads from the typed Wirken session
+  stream (Custom-WirkenSession_CL).
+severity: Medium
+status: Available
+requiredDataConnectors: []
+queryFrequency: PT5M
+queryPeriod: PT15M
+triggerOperator: GreaterThan
+triggerThreshold: 0
+suppressionDuration: PT0M
+suppressionEnabled: false
+tactics:
+  - CommandAndControl
+relevantTechniques:
+  - T1071
+  - T1105
+query: |
+  let outbound_verbs = dynamic([
+    "curl", "wget", "msiexec", "invoke-webrequest", "iwr",
+    "bitsadmin", "certutil"
+  ]);
+  Custom_WirkenSession_CL
+  | where Kind == "assistant_tool_calls"
+  | mv-expand call = parse_json(Event).calls
+  | where tostring(call.name) == "exec"
+  | extend args = parse_json(tostring(call.arguments))
+  | extend cmd = tostring(args.command)
+  | extend first_token = tolower(
+      replace_string(
+        extract(@"^([^ ]+)", 1, cmd), "", ""))
+  | extend canonical = tolower(
+      iff(first_token contains "/",
+          substring(first_token, indexof(first_token, "/") + 1),
+          first_token))
+  | where outbound_verbs has tolower(strcat_array(split(canonical, "/"), ""))
+  | extend url = extract(@"https?://[^\s'""<>]+", 0, cmd)
+  | extend host = extract(@"https?://([^/:?#]+)", 1, url)
+  | project
+      TimeGenerated,
+      SessionId,
+      Seq,
+      AgentId = tostring(parse_json(Event).agent_id),
+      AdapterId,
+      SenderId,
+      ToolCallId = tostring(call.id),
+      Host = host,
+      Url = url,
+      RawArgv = cmd
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: SenderId
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: Host
+  - entityType: URL
+    fieldMappings:
+      - identifier: Url
+        columnName: Url

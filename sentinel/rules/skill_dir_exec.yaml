@@ -1,0 +1,49 @@
+id: 7c4f9c41-2a5e-4b8e-a3e0-d1c0a01a0004
+name: Wirken - skill-dir-resident binary executed
+description: |
+  Detection 4. Fires when the agent runs an exec command whose
+  argv contains a path under any prefix in the
+  wirken_skill_dirs watchlist. An empty watchlist makes this
+  rule return zero rows; populate it via the Sentinel
+  watchlist admin (see sentinel/README.md).
+severity: High
+status: Available
+requiredDataConnectors: []
+queryFrequency: PT15M
+queryPeriod: PT30M
+triggerOperator: GreaterThan
+triggerThreshold: 0
+suppressionDuration: PT0M
+suppressionEnabled: false
+tactics:
+  - Execution
+  - Persistence
+relevantTechniques:
+  - T1059
+query: |
+  let prefixes = _GetWatchlist("wirken_skill_dirs") | project prefix;
+  Custom_WirkenSession_CL
+  | where Kind == "assistant_tool_calls"
+  | mv-expand call = parse_json(Event).calls
+  | where tostring(call.name) == "exec"
+  | extend Argv = tostring(parse_json(tostring(call.arguments)).command)
+  | extend MatchedPrefix = tostring(toscalar(
+      prefixes
+      | where Argv contains tostring(prefix)
+      | take 1
+      | project prefix))
+  | where isnotempty(MatchedPrefix)
+  | project
+      TimeGenerated,
+      SessionId,
+      Seq,
+      AgentId = tostring(parse_json(Event).agent_id),
+      AdapterId,
+      SenderId,
+      MatchedPrefix,
+      Argv
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: SenderId

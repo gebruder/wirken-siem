@@ -1,0 +1,60 @@
+id: 7c4f9c41-2a5e-4b8e-a3e0-d1c0a01a0003
+name: Wirken - binary write via write_file
+description: |
+  Detection 3. Fires when the agent writes a file whose path
+  extension matches a binary-extension allow-list or whose
+  content head matches a known printable magic-byte prefix.
+severity: High
+status: Available
+requiredDataConnectors: []
+queryFrequency: PT15M
+queryPeriod: PT30M
+triggerOperator: GreaterThan
+triggerThreshold: 0
+suppressionDuration: PT0M
+suppressionEnabled: false
+tactics:
+  - DefenseEvasion
+  - Persistence
+relevantTechniques:
+  - T1105
+  - T1547
+query: |
+  Custom_WirkenSession_CL
+  | where Kind == "assistant_tool_calls"
+  | mv-expand call = parse_json(Event).calls
+  | where tostring(call.name) == "write_file"
+  | extend args = parse_json(tostring(call.arguments))
+  | extend FilePath = tostring(args.path)
+  | extend Content = tostring(args.content)
+  | extend Extension = tolower(extract(
+      @"\.(exe|dll|so|dylib|msi|scr|bat|ps1|sh|cmd|com|vbs|jar)$",
+      1, FilePath))
+  // ELF magic begins with a 0x7F control byte that KQL string
+  // literals do not surface portably. The Python webhook rule
+  // carries the full magic set; Sentinel falls back to the
+  // extension allow-list for ELF binaries (`*.so`, `*.dylib`).
+  | extend Magic = case(
+      substring(Content, 0, 2) == "MZ", "pe_or_ne",
+      substring(Content, 0, 2) == "PK", "zip_or_jar",
+      "")
+  | where Extension != "" or Magic != ""
+  | project
+      TimeGenerated,
+      SessionId,
+      Seq,
+      AgentId = tostring(parse_json(Event).agent_id),
+      AdapterId,
+      SenderId,
+      FilePath,
+      Extension,
+      Magic
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: SenderId
+  - entityType: File
+    fieldMappings:
+      - identifier: Name
+        columnName: FilePath
