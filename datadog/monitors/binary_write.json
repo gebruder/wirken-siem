@@ -1,0 +1,16 @@
+{
+  "name": "Wirken: binary write via write_file",
+  "type": "log alert",
+  "query": "logs(\"@ddsource:wirken @wirken.kind:assistant_tool_calls @wirken.event.calls.name:write_file (@write_file_extension:exe OR @write_file_extension:dll OR @write_file_extension:so OR @write_file_extension:dylib OR @write_file_extension:msi OR @write_file_extension:scr OR @write_file_extension:bat OR @write_file_extension:ps1 OR @write_file_extension:sh OR @write_file_extension:cmd OR @write_file_extension:com OR @write_file_extension:vbs OR @write_file_extension:jar OR @write_file_magic:*)\").index(\"main\").rollup(\"count\").last(\"15m\") > 0",
+  "message": "Wirken agent wrote a file matching a binary-extension allow-list or a content magic-byte prefix.\n\nDetection: binary_write (3)\nSeverity baseline: high\n\nFields to pivot on: @wirken.session_id, @wirken.event.agent_id, @wirken.event.adapter_id, @wirken.event.sender_id, @write_file_path, @write_file_extension, @write_file_magic.\n\nThe `@write_file_extension` and `@write_file_magic` fields are materialised by a Datadog log parsing pipeline that JSON-parses @wirken.event.calls.arguments, extracts `path` and `content`, regexes the extension, and prefix-matches the content head. See datadog/README.md.\n\n@security-team",
+  "tags": ["service:wirken", "detection:binary_write", "source:wirken-siem"],
+  "options": {
+    "thresholds": {"critical": 0},
+    "notify_audit": false,
+    "include_tags": true,
+    "evaluation_delay": 60,
+    "new_group_delay": 60,
+    "renotify_interval": 30
+  },
+  "priority": 2
+}

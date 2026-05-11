@@ -1,0 +1,16 @@
+{
+  "name": "Wirken: long-running exec tool call",
+  "type": "log alert",
+  "query": "logs(\"@ddsource:wirken @wirken.kind:tool_result @wirken.event.tool_name:exec @wirken.event.success:true @exec_duration_ms:>30000\").index(\"main\").rollup(\"count\").last(\"15m\") > 0",
+  "message": "Wirken exec tool call took longer than 30 seconds.\n\nDetection: exec_fork_pairing (2), long-running subset\nSeverity baseline: medium\n\nPivot via @wirken.session_id and @wirken.event.call_id to find the matching AssistantToolCalls row (Datadog log-link by call_id).\n\nThe `@exec_duration_ms` field is materialised by a Datadog log parsing pipeline that joins `tool_result` rows to the preceding `assistant_tool_calls` row by (session_id, call_id) and computes the timestamp delta. The Datadog log-link itself does the join at query time; the pipeline pre-computes the duration for monitor-side thresholding.\n\nFor failed-exec alerts, file a sibling monitor with `@wirken.event.success:false` and drop the duration clause.\n\n@security-team",
+  "tags": ["service:wirken", "detection:exec_fork_pairing", "subset:long_running", "source:wirken-siem"],
+  "options": {
+    "thresholds": {"critical": 0},
+    "notify_audit": false,
+    "include_tags": true,
+    "evaluation_delay": 60,
+    "new_group_delay": 60,
+    "renotify_interval": 0
+  },
+  "priority": 3
+}

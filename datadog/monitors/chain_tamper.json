@@ -1,0 +1,16 @@
+{
+  "name": "Wirken: audit chain tamper detected",
+  "type": "log alert",
+  "query": "logs(\"@ddsource:wirken @wirken.action:audit.chain_broken\").index(\"main\").rollup(\"count\").last(\"5m\") > 0",
+  "message": "Wirken's periodic chain-verify pass reported a hash mismatch.\n\nDetection: chain_tamper (6)\nSeverity baseline: high\n\nFields to pivot on: @wirken.session, @wirken.detail.session_id, @wirken.detail.seq, @wirken.detail.expected_hash, @wirken.detail.actual_hash, @wirken.detail.verified_count.\n\nPromotion to critical: when the alarm-log feed at @ddsource:wirken-alarm-log does NOT show a matching @session_id+@seq within +/-60s, the integrity break is undocumented and severity is critical. Wire this as a composite monitor with a 'NOT' clause once the alarm log is ingested as its own source (see datadog/README.md).\n\n@security-team",
+  "tags": ["service:wirken", "detection:chain_tamper", "source:wirken-siem"],
+  "options": {
+    "thresholds": {"critical": 0},
+    "notify_audit": true,
+    "include_tags": true,
+    "evaluation_delay": 60,
+    "new_group_delay": 60,
+    "renotify_interval": 15
+  },
+  "priority": 1
+}

@@ -1,0 +1,16 @@
+{
+  "name": "Wirken: skill-dir-resident binary executed",
+  "type": "log alert",
+  "query": "logs(\"@ddsource:wirken @wirken.kind:assistant_tool_calls @wirken.event.calls.name:exec @argv_skill_dir_match:true\").index(\"main\").rollup(\"count\").last(\"15m\") > 0",
+  "message": "Wirken agent ran an exec command whose argv contains a configured skill_dir prefix.\n\nDetection: skill_dir_exec (4)\nSeverity baseline: high\n\nFields to pivot on: @wirken.session_id, @wirken.event.agent_id, @wirken.event.adapter_id, @wirken.event.sender_id, @argv_skill_dir, @argv_command.\n\nThe `@argv_skill_dir_match` and `@argv_skill_dir` fields require a Datadog log parsing pipeline that compares the argv against a reference table of skill_dir prefixes. The reference table name is `wirken_skill_dirs`. An empty table makes this monitor never fire; operators should populate it (see datadog/README.md) or disable the monitor.\n\n@security-team",
+  "tags": ["service:wirken", "detection:skill_dir_exec", "source:wirken-siem"],
+  "options": {
+    "thresholds": {"critical": 0},
+    "notify_audit": false,
+    "include_tags": true,
+    "evaluation_delay": 60,
+    "new_group_delay": 60,
+    "renotify_interval": 30
+  },
+  "priority": 2
+}

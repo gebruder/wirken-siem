@@ -1,0 +1,17 @@
+{
+  "name": "Wirken: shell-driven outbound fetch",
+  "type": "log alert",
+  "query": "logs(\"@ddsource:wirken @wirken.kind:assistant_tool_calls @wirken.event.calls.name:exec (@argv_first:curl OR @argv_first:wget OR @argv_first:msiexec OR @argv_first:invoke-webrequest OR @argv_first:iwr OR @argv_first:bitsadmin OR @argv_first:certutil)\").index(\"main\").rollup(\"count\").last(\"5m\") > 0",
+  "message": "Wirken agent ran a shell command that fetches over HTTP(S).\n\nDetection: shell_outbound_fetch (1)\nSeverity baseline: medium\n\nFields to pivot on: @wirken.session_id, @wirken.event.agent_id, @wirken.event.adapter_id, @wirken.event.sender_id, @wirken.event.calls.id, @argv_command.\n\nThe `argv_first` field is materialised by a Datadog log parsing pipeline that splits the first whitespace token of @wirken.event.calls.arguments. See datadog/README.md for the pipeline JSON.\n\n@security-team",
+  "tags": ["service:wirken", "detection:shell_outbound_fetch", "source:wirken-siem"],
+  "options": {
+    "thresholds": {"critical": 0},
+    "notify_audit": false,
+    "include_tags": true,
+    "evaluation_delay": 60,
+    "new_group_delay": 60,
+    "renotify_interval": 60,
+    "escalation_message": ""
+  },
+  "priority": 3
+}
