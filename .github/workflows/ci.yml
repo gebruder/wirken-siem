@@ -1,0 +1,68 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-yaml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install yamllint
+        run: pip install yamllint==1.35.1
+      - name: Lint Sentinel rules
+        run: yamllint -c .yamllint sentinel/rules
+
+  parse-json:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: jq parse Datadog monitors
+        run: |
+          set -e
+          for f in datadog/monitors/*.json datadog/dashboards/*.json; do
+            echo "checking $f"
+            jq empty "$f"
+          done
+      - name: jq parse Sentinel workbooks
+        run: |
+          set -e
+          for f in sentinel/workbooks/*.json; do
+            echo "checking $f"
+            jq empty "$f"
+          done
+      - name: jq parse webhook fixtures
+        run: |
+          set -e
+          for f in webhook/tests/fixtures/*.json; do
+            echo "checking $f"
+            jq empty "$f"
+          done
+
+  splunk-conf-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Splunk conf basic parse
+        run: python3 scripts/check_splunk_conf.py splunk
+
+  python:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: webhook
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Ruff
+        run: ruff check .
+      - name: Pytest
+        run: pytest -q
