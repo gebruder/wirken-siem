@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-05-11T12:30:00Z",
+  "actor_kind": "service",
+  "actor_id": "audit",
+  "action": "audit.chain_broken",
+  "target": "audit.db",
+  "channel": null,
+  "session": "sess-1",
+  "detail": {
+    "session_id": "sess-1",
+    "seq": 42,
+    "expected_hash": "aabb",
+    "actual_hash": "ccdd",
+    "verified_count": 41
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

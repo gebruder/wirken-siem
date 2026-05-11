@@ -1,0 +1,18 @@
+[project]
+name = "wirken-siem-webhook"
+version = "0.1.0"
+description = "Reference webhook consumer for Wirken 1.3.x audit events."
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501"]  # line length handled by ruff line-length above
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

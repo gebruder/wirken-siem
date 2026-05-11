@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-05-11T12:00:02Z",
+  "session_id": "sess-1",
+  "seq": 8,
+  "kind": "tool_result",
+  "trust": "tool",
+  "event": {
+    "kind": "tool_result",
+    "call_id": "call-abc",
+    "tool_name": "exec",
+    "output": "200 OK\n2048 bytes\n",
+    "success": true,
+    "agent_id": "default",
+    "adapter_id": "slack",
+    "sender_id": "U12345"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}
