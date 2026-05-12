@@ -10,7 +10,12 @@ binary.
 
 | wirken-siem | Wirken audit schema |
 |-------------|---------------------|
-| 0.1         | 1.3.x               |
+| 0.1         | 1.3.x, 1.4.x        |
+
+Wirken 1.4.0 added `credential_id: Option<String>` to `LlmRequest`
+and `LlmResponse`. Those variants are not consumed by any
+detection in this repo, so the field addition is informational
+only and existing detection content continues to work unmodified.
 
 ## Field index
 
@@ -41,10 +46,13 @@ target.
 | 4  | Skill-dir-resident binary executed | `AssistantToolCalls`           | high              |
 | 6  | Chain tamper correlation           | `AuditLegacy` (`audit.chain_broken`) | high; critical when alarm log missing |
 
-Detection 5 is intentionally absent: it corresponds to a code gap
-(`Action::SkillInstall` is declared as a Tier 3 action but the
-`wirken skills install` CLI path does not route through the agent
-tier gate). That gap is closed in wirken, not in detection content.
+Detection 5 is intentionally absent. It originally tracked the
+unreachable `Action::SkillInstall` Tier 3 variant; that variant was
+removed in Wirken 1.4.0 because the install CLI is operator-typed
+and gated by registry-anchored signature verification, not tier
+classification. There is nothing for a runtime detection to fire
+on; install posture is captured at the signature-verification
+boundary on the wirken side.
 
 ## Layout
 
@@ -58,6 +66,35 @@ tier gate). That gap is closed in wirken, not in detection content.
 - `webhook/` reference Python consumer that verifies the
   `X-Wirken-Signature` HMAC over the raw POST body, then runs the
   five rules in-process.
+
+## Operating notes
+
+### Tier 3 deny-but-detected
+
+Detections 1 (shell outbound fetch) and 4 (skill-dir-resident
+exec) fire on `AssistantToolCalls` before Wirken's runtime
+permission tier decision. The detection sees the model's attempt;
+whether the action then runs depends on the channel:
+
+- **Channels without a human approval loop** (`webchat`, `cron`,
+  unattended subagents): Tier 3 verbs auto-deny. The paired
+  `ToolResult` carries `success: false` and the model's request
+  does not execute. The detection still fires because the source
+  variant for both rules is `AssistantToolCalls`, which records
+  the model's intent at the moment of the call.
+- **Channels with a human approval loop** (Telegram, Signal,
+  Slack, Discord, and other adapter-bound channels): the operator
+  is prompted to approve or deny the tool call. The detection
+  fires either way; whether the paired `ToolResult` indicates
+  success depends on the operator's decision.
+
+This is the right shape: the detection is a record of the LLM's
+behavior. The tier gate is wirken's enforcement. Treating them as
+the same signal would conflate "the model tried to do X" with "X
+happened," and the SOC needs both.
+
+Reference: smoke-test finding from the Wirken 1.4.0 release
+validation.
 
 ## What this repo is not
 
