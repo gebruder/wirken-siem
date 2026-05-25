@@ -10,12 +10,35 @@ binary.
 
 | wirken-siem | Wirken audit schema |
 |-------------|---------------------|
-| 0.1         | 1.3.x, 1.4.x        |
+| 0.1         | 1.3.x – 1.7.x       |
 
-Wirken 1.4.0 added `credential_id: Option<String>` to `LlmRequest`
-and `LlmResponse`. Those variants are not consumed by any
-detection in this repo, so the field addition is informational
-only and existing detection content continues to work unmodified.
+Every audit-schema change from 1.4.0 through 1.7.2 has been
+field-additive (`#[serde(default)]` on new fields, new variants
+sitting alongside existing ones). Existing detection content in
+this repo continues to fire unmodified across the range.
+
+New `SessionEvent` variants since 1.4.x, not yet consumed by any
+detection here:
+
+- `HookRegistered`, `HookDispatched` (out-of-process hook protocol)
+- `EgressHookDispatched`, `ToolOutputRedacted` (egress dispatcher
+  on post-execution tool output)
+- `McpEntryVerified`, `McpEntryRefused` (mcp.json signature anchor)
+- `PhaseEntered`, `PhaseExited`, `SkillPermissionDenied`
+  (per-skill phase deny overlay)
+- `SessionScopedApprovalsCleared` (session-scoped approval lifecycle)
+- `ChainHead` (gateway-keyed signature over chain ranges)
+- `Compaction` (context-engine compaction extracts)
+
+Fields added to existing variants since 1.4.x:
+
+- `PermissionDenied` / `PermissionApproved`: `denial_source`,
+  `denied_via`, `denial_reason`, `approved_via`, `adapter_id`,
+  `sender_id`, `scope` (`ApprovalScopeKind`), `session_id`.
+- `LlmResponse`: `input_cost_usd_micros`, `output_cost_usd_micros`,
+  `total_cost_usd_micros`, `cache_creation_input_tokens`,
+  `cache_read_input_tokens`.
+- `HttpFetch`: `expansion_id`, `skill_name`.
 
 ## Field index
 
