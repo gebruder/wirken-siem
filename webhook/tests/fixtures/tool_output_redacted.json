@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-05-11T12:34:00Z",
+  "session_id": "sess-1",
+  "seq": 25,
+  "kind": "tool_output_redacted",
+  "trust": "tool",
+  "event": {
+    "kind": "tool_output_redacted",
+    "call_id": "call-xyz",
+    "hook_id": "egress-secret-redactor",
+    "reason": "egress-secret-redactor replaced",
+    "original_sha256": "aaaa",
+    "original_size": 4096,
+    "redacted_sha256": "bbbb",
+    "redacted_size": 4080,
+    "agent_id": "default",
+    "adapter_id": "slack",
+    "sender_id": "U12345"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

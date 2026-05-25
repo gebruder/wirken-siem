@@ -1,6 +1,7 @@
-"""Unit tests for the rules module. Fixtures match the 1.3.x
-webhook envelope shape (typed entries and the legacy entry for
-Detection 6). One test per rule plus negative cases."""
+"""Unit tests for the rules module. Fixtures match the typed
+webhook envelope (entries with `kind`, `session_id`, `seq`) and
+the legacy webhook envelope (Detection 5). One test per rule plus
+negative cases."""
 from __future__ import annotations
 
 import copy
@@ -181,7 +182,7 @@ def test_skill_dir_exec_does_not_fire_when_prefix_absent_from_argv():
 
 
 # ---------------------------------------------------------------
-# Detection 6
+# Detection 5
 # ---------------------------------------------------------------
 
 
@@ -207,6 +208,99 @@ def test_chain_tamper_ignores_other_legacy_actions():
 
 
 # ---------------------------------------------------------------
+# Detection 6
+# ---------------------------------------------------------------
+
+
+def test_mcp_entry_refused_fires_on_typed_envelope():
+    ev = load_fixture("mcp_entry_refused.json")
+    m = rules.detect_mcp_entry_refused(ev)
+    assert m is not None
+    assert m["detection"] == "mcp_entry_refused"
+    assert m["severity"] == "high"
+    assert m["session_id"] == "gateway-mcp"
+    assert m["seq"] == 17
+    assert m["server_name"] == "tampered-server"
+    assert m["reason"] == "signature_invalid"
+
+
+def test_mcp_entry_refused_ignores_legacy_envelope():
+    ev = load_fixture("audit_legacy_chain_broken.json")
+    assert rules.detect_mcp_entry_refused(ev) is None
+
+
+def test_mcp_entry_refused_ignores_other_typed_kinds():
+    ev = load_fixture("tool_result.json")
+    assert rules.detect_mcp_entry_refused(ev) is None
+
+
+# ---------------------------------------------------------------
+# Detection 7
+# ---------------------------------------------------------------
+
+
+def test_hook_refused_fires_on_deny():
+    ev = load_fixture("hook_dispatched_deny.json")
+    m = rules.detect_hook_refused(ev)
+    assert m is not None
+    assert m["detection"] == "hook_refused"
+    assert m["severity"] == "medium"
+    assert m["decision_kind"] == "deny"
+    assert m["decision_reason"] == "shell exec to external host blocked by policy"
+    assert m["hook_id"] == "veto-shell-block"
+    assert m["tool_name"] == "exec"
+    assert m["adapter_id"] == "slack"
+
+
+def test_hook_refused_fires_on_timeout():
+    ev = load_fixture("hook_dispatched_timeout.json")
+    m = rules.detect_hook_refused(ev)
+    assert m is not None
+    assert m["decision_kind"] == "timeout"
+    assert m["decision_reason"] is None
+
+
+def test_hook_refused_does_not_fire_on_allow():
+    ev = load_fixture("hook_dispatched_allow.json")
+    assert rules.detect_hook_refused(ev) is None
+
+
+def test_hook_refused_ignores_other_typed_kinds():
+    ev = load_fixture("tool_result.json")
+    assert rules.detect_hook_refused(ev) is None
+
+
+# ---------------------------------------------------------------
+# Detection 8
+# ---------------------------------------------------------------
+
+
+def test_tool_output_redacted_fires_on_typed_envelope():
+    ev = load_fixture("tool_output_redacted.json")
+    m = rules.detect_tool_output_redacted(ev)
+    assert m is not None
+    assert m["detection"] == "tool_output_redacted"
+    assert m["severity"] == "medium"
+    assert m["call_id"] == "call-xyz"
+    assert m["hook_id"] == "egress-secret-redactor"
+    assert m["original_sha256"] == "aaaa"
+    assert m["original_size"] == 4096
+    assert m["redacted_sha256"] == "bbbb"
+    assert m["redacted_size"] == 4080
+    assert m["reason"].startswith("egress-secret-redactor")
+
+
+def test_tool_output_redacted_ignores_other_typed_kinds():
+    ev = load_fixture("tool_result.json")
+    assert rules.detect_tool_output_redacted(ev) is None
+
+
+def test_tool_output_redacted_ignores_legacy_envelope():
+    ev = load_fixture("audit_legacy_chain_broken.json")
+    assert rules.detect_tool_output_redacted(ev) is None
+
+
+# ---------------------------------------------------------------
 # evaluate() composition
 # ---------------------------------------------------------------
 
@@ -223,6 +317,24 @@ def test_evaluate_returns_multiple_partial_matches_on_tool_call_event():
 def test_evaluate_empty_when_no_detection_applies():
     ev = load_fixture("http_fetch.json")
     assert rules.evaluate(ev, []) == []
+
+
+def test_evaluate_routes_mcp_entry_refused_through_composition():
+    ev = load_fixture("mcp_entry_refused.json")
+    matches = rules.evaluate(ev, [])
+    assert any(m["detection"] == "mcp_entry_refused" for m in matches)
+
+
+def test_evaluate_routes_hook_refused_through_composition():
+    ev = load_fixture("hook_dispatched_deny.json")
+    matches = rules.evaluate(ev, [])
+    assert any(m["detection"] == "hook_refused" for m in matches)
+
+
+def test_evaluate_routes_tool_output_redacted_through_composition():
+    ev = load_fixture("tool_output_redacted.json")
+    matches = rules.evaluate(ev, [])
+    assert any(m["detection"] == "tool_output_redacted" for m in matches)
 
 
 # ---------------------------------------------------------------

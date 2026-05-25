@@ -1,7 +1,7 @@
-id: 7c4f9c41-2a5e-4b8e-a3e0-d1c0a01a0006
+id: 7c4f9c41-2a5e-4b8e-a3e0-d1c0a01a0005
 name: Wirken - audit chain tamper detected
 description: |
-  Detection 6. Fires on every audit.chain_broken row in the
+  Detection 5. Fires on every audit.chain_broken row in the
   legacy Wirken audit feed. Baseline severity is High; the rule
   promotes to Critical when the alarm-log feed
   (Custom_WirkenAlarms_CL) does not show a matching row by

@@ -51,7 +51,7 @@ filename = wirken_skill_dirs.csv
 An empty lookup makes `wirken_d4_skill_dir_exec` return zero rows;
 the search still parses cleanly but never matches.
 
-## Alarm log (Detection 6)
+## Alarm log (Detection 5)
 
 The audit-alarms log is a separate file (default
 `~/.wirken/audit-alarms.log`, signed Ed25519 entries). Wire it
@@ -62,7 +62,7 @@ into Splunk as a file input with sourcetype `wirken:alarm-log`:
 sourcetype = wirken:alarm-log
 ```
 
-The Detection 6 saved search joins on `(session_id, seq)` with a
+The Detection 5 saved search joins on `(session_id, seq)` with a
 +/-60s window. The alarm log's row carries the same two fields in
 its detail JSON.
 
@@ -76,4 +76,7 @@ its detail JSON.
 | `wirken_d2_exec_fork_pairing_failed`          | derived          | success = false |
 | `wirken_d3_binary_write`                      | `wirken:session` | Detection 3 |
 | `wirken_d4_skill_dir_exec`                    | `wirken:session` | Detection 4, needs lookup |
-| `wirken_d6_chain_tamper`                      | `wirken:audit`   | Detection 6 |
+| `wirken_d5_chain_tamper`                      | `wirken:audit`   | Detection 5 |
+| `wirken_d6_mcp_entry_refused`                 | `wirken:session` | Detection 6 |
+| `wirken_d7_hook_refused`                      | `wirken:session` | Detection 7, fires on decision.kind in {deny, timeout} |
+| `wirken_d8_tool_output_redacted`              | `wirken:session` | Detection 8 |

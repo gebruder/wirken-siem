@@ -1,0 +1,43 @@
+id: 7c4f9c41-2a5e-4b8e-a3e0-d1c0a01a0008
+name: Wirken - tool output redacted by egress hook
+description: |
+  Detection 8. Fires on any ToolOutputRedacted row. The egress hook
+  dispatcher replaced or refused bytes from a tool's output before
+  the bytes entered the LLM conversation. Plaintext is not on the
+  chain by design; original_sha256 is the only on-chain reference
+  to the bytes the tool produced.
+severity: Medium
+status: Available
+requiredDataConnectors: []
+queryFrequency: PT15M
+queryPeriod: PT15M
+triggerOperator: GreaterThan
+triggerThreshold: 0
+suppressionDuration: PT0M
+suppressionEnabled: false
+tactics:
+  - Collection
+relevantTechniques: []
+query: |
+  Custom_WirkenSession_CL
+  | where Kind == "tool_output_redacted"
+  | extend body = parse_json(Event)
+  | project
+      TimeGenerated,
+      SessionId,
+      Seq,
+      AgentId = tostring(body.agent_id),
+      AdapterId = tostring(body.adapter_id),
+      SenderId = tostring(body.sender_id),
+      CallId = tostring(body.call_id),
+      HookId = tostring(body.hook_id),
+      Reason = tostring(body.reason),
+      OriginalSha256 = tostring(body.original_sha256),
+      OriginalSize = tolong(body.original_size),
+      RedactedSha256 = tostring(body.redacted_sha256),
+      RedactedSize = tolong(body.redacted_size)
+entityMappings:
+  - entityType: AzureResource
+    fieldMappings:
+      - identifier: ResourceId
+        columnName: SessionId

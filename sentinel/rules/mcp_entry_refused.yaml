@@ -1,0 +1,37 @@
+id: 7c4f9c41-2a5e-4b8e-a3e0-d1c0a01a0006
+name: Wirken - MCP entry refused at proxy load
+description: |
+  Detection 6. Fires on any McpEntryRefused row. The MCP entry
+  failed signature verification at proxy load and the client never
+  spawned. `reason` is a closed-set snake_case label: signature_invalid,
+  unsigned, signer_key_missing, signer_key_decode_failed,
+  delegation_required.
+severity: High
+status: Available
+requiredDataConnectors: []
+queryFrequency: PT15M
+queryPeriod: PT15M
+triggerOperator: GreaterThan
+triggerThreshold: 0
+suppressionDuration: PT0M
+suppressionEnabled: false
+tactics:
+  - InitialAccess
+  - DefenseEvasion
+relevantTechniques:
+  - T1195
+query: |
+  Custom_WirkenSession_CL
+  | where Kind == "mcp_entry_refused"
+  | extend body = parse_json(Event)
+  | project
+      TimeGenerated,
+      SessionId,
+      Seq,
+      ServerName = tostring(body.server_name),
+      Reason = tostring(body.reason)
+entityMappings:
+  - entityType: AzureResource
+    fieldMappings:
+      - identifier: ResourceId
+        columnName: ServerName

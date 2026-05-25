@@ -17,8 +17,9 @@ field-additive (`#[serde(default)]` on new fields, new variants
 sitting alongside existing ones). Existing detection content in
 this repo continues to fire unmodified across the range.
 
-New `SessionEvent` variants since 1.4.x, not yet consumed by any
-detection here:
+`SessionEvent` variants added since 1.4.x. Detections 6, 7, and 8
+consume `McpEntryRefused`, `HookDispatched`, and
+`ToolOutputRedacted`. The remaining variants are reserved.
 
 - `HookRegistered`, `HookDispatched` (out-of-process hook protocol)
 - `EgressHookDispatched`, `ToolOutputRedacted` (egress dispatcher
@@ -52,7 +53,10 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `AssistantToolCalls`   | `agent_id`, `adapter_id?`, `sender_id?`, `calls[].{id,name,arguments}`  | 1, 2, 3, 4        |
 | `ToolResult`           | `agent_id`, `adapter_id?`, `sender_id?`, `call_id`, `tool_name`, `success`, `output` | 2 |
 | `HttpFetch`            | `agent_id?`, `skill_name?`, `host`, `url`, `outcome`, `http_status_code?`, `bytes` | (none here; reserved) |
-| `AuditLegacy`          | `actor_kind`, `actor_id`, `action`, `target`, `detail`                  | 6                 |
+| `AuditLegacy`          | `actor_kind`, `actor_id`, `action`, `target`, `detail`                  | 5                 |
+| `McpEntryRefused`      | `server_name`, `reason` (`signature_invalid` / `unsigned` / `signer_key_missing` / `signer_key_decode_failed` / `delegation_required`) | 6 |
+| `HookDispatched`       | `hook_id`, `tool_name`, `agent_id`, `adapter_id?`, `sender_id?`, `decision.kind` (`allow` / `deny` / `timeout`), `decision.reason?` | 7 |
+| `ToolOutputRedacted`   | `call_id`, `hook_id`, `agent_id`, `adapter_id?`, `sender_id?`, `reason`, `original_sha256`, `original_size`, `redacted_sha256`, `redacted_size` | 8 |
 
 Row metadata on every typed event: `session_id`, `seq`, `ts`,
 `trust`, `kind`. The forwarder wraps each row in a per-target
@@ -67,15 +71,10 @@ target.
 | 2  | Child process fork pairing         | `AssistantToolCalls` + `ToolResult` | low (info) |
 | 3  | Binary write via `write_file`      | `AssistantToolCalls`           | high              |
 | 4  | Skill-dir-resident binary executed | `AssistantToolCalls`           | high              |
-| 6  | Chain tamper correlation           | `AuditLegacy` (`audit.chain_broken`) | high; critical when alarm log missing |
-
-Detection 5 is intentionally absent. It originally tracked the
-unreachable `Action::SkillInstall` Tier 3 variant; that variant was
-removed in Wirken 1.4.0 because the install CLI is operator-typed
-and gated by registry-anchored signature verification, not tier
-classification. There is nothing for a runtime detection to fire
-on; install posture is captured at the signature-verification
-boundary on the wirken side.
+| 5  | Chain tamper correlation           | `AuditLegacy` (`audit.chain_broken`) | high; critical when alarm log missing |
+| 6  | MCP entry refused at proxy load    | `McpEntryRefused`              | high              |
+| 7  | Veto hook denied or timed out      | `HookDispatched`               | medium            |
+| 8  | Tool output redacted by egress hook | `ToolOutputRedacted`          | medium            |
 
 ## Layout
 
@@ -115,9 +114,6 @@ This is the right shape: the detection is a record of the LLM's
 behavior. The tier gate is wirken's enforcement. Treating them as
 the same signal would conflate "the model tried to do X" with "X
 happened," and the SOC needs both.
-
-Reference: smoke-test finding from the Wirken 1.4.0 release
-validation.
 
 ## What this repo is not
 

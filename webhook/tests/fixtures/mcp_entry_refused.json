@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-05-11T12:30:00Z",
+  "session_id": "gateway-mcp",
+  "seq": 17,
+  "kind": "mcp_entry_refused",
+  "trust": "system",
+  "event": {
+    "kind": "mcp_entry_refused",
+    "server_name": "tampered-server",
+    "reason": "signature_invalid"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

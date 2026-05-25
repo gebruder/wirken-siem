@@ -1,0 +1,16 @@
+{
+  "name": "Wirken: MCP entry refused at proxy load",
+  "type": "log alert",
+  "query": "logs(\"@ddsource:wirken @wirken.kind:mcp_entry_refused\").index(\"main\").rollup(\"count\").last(\"15m\") > 0",
+  "message": "An MCP entry in mcp.json failed signature verification at proxy load. The MCP client never spawned.\n\nDetection: mcp_entry_refused (6)\nSeverity baseline: high\n\nFields to pivot on: @wirken.session_id, @wirken.seq, @wirken.event.server_name, @wirken.event.reason.\n\n`reason` is a closed-set snake_case label: signature_invalid, unsigned, signer_key_missing, signer_key_decode_failed, delegation_required. Each names a distinct failure mode at the signature anchor; investigate which mcp.json entry failed and why.\n\n@security-team",
+  "tags": ["service:wirken", "detection:mcp_entry_refused", "source:wirken-siem"],
+  "options": {
+    "thresholds": {"critical": 0},
+    "notify_audit": true,
+    "include_tags": true,
+    "evaluation_delay": 60,
+    "new_group_delay": 60,
+    "renotify_interval": 30
+  },
+  "priority": 2
+}

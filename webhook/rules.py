@@ -36,9 +36,6 @@ Envelope shapes:
       "environment": "...",
       "hostname": "..."
     }
-
-Detection 5 corresponds to a wirken code gap, not a SOC detection;
-it is intentionally absent.
 """
 from __future__ import annotations
 
@@ -317,7 +314,7 @@ def detect_skill_dir_exec(event: Event, skill_dirs: Iterable[str]) -> Match | No
 
 
 # ---------------------------------------------------------------
-# Detection 6: chain tamper correlation
+# Detection 5: chain tamper correlation
 # ---------------------------------------------------------------
 #
 # The chain-broken signal is a legacy AuditEvent (the writer's
@@ -349,6 +346,94 @@ def detect_chain_tamper(event: Event) -> Match | None:
 
 
 # ---------------------------------------------------------------
+# Detection 6: MCP entry refused at proxy load
+# ---------------------------------------------------------------
+#
+# Fires on any McpEntryRefused row. The MCP client never spawned;
+# the proxy refused the entry at load. `reason` is closed-set
+# (signature_invalid / unsigned / signer_key_missing /
+# signer_key_decode_failed / delegation_required).
+
+
+def detect_mcp_entry_refused(event: Event) -> Match | None:
+    if not _is_typed_kind(event, "mcp_entry_refused"):
+        return None
+    body = event["event"]
+    return {
+        "detection": "mcp_entry_refused",
+        "severity": "high",
+        "session_id": event.get("session_id"),
+        "seq": event.get("seq"),
+        "server_name": body.get("server_name"),
+        "reason": body.get("reason"),
+    }
+
+
+# ---------------------------------------------------------------
+# Detection 7: veto hook denied or timed out
+# ---------------------------------------------------------------
+#
+# Fires on HookDispatched rows whose decision.kind is deny or
+# timeout. Timeout is fail-closed in production (the tool call is
+# refused); it lands on the chain so reviewers distinguish timeout
+# from explicit deny.
+
+
+def detect_hook_refused(event: Event) -> Match | None:
+    if not _is_typed_kind(event, "hook_dispatched"):
+        return None
+    body = event["event"]
+    decision = body.get("decision") or {}
+    kind = decision.get("kind") if isinstance(decision, dict) else None
+    if kind not in ("deny", "timeout"):
+        return None
+    return {
+        "detection": "hook_refused",
+        "severity": "medium",
+        "session_id": event.get("session_id"),
+        "seq": event.get("seq"),
+        "agent_id": body.get("agent_id"),
+        "adapter_id": body.get("adapter_id"),
+        "sender_id": body.get("sender_id"),
+        "hook_id": body.get("hook_id"),
+        "tool_name": body.get("tool_name"),
+        "decision_kind": kind,
+        "decision_reason": decision.get("reason"),
+    }
+
+
+# ---------------------------------------------------------------
+# Detection 8: tool output redacted by egress hook
+# ---------------------------------------------------------------
+#
+# Fires on any ToolOutputRedacted row. Plaintext is not on the
+# chain by design; original_sha256 is the only on-chain reference
+# to the bytes the tool produced.
+
+
+def detect_tool_output_redacted(event: Event) -> Match | None:
+    if not _is_typed_kind(event, "tool_output_redacted"):
+        return None
+    body = event["event"]
+    return {
+        "detection": "tool_output_redacted",
+        "severity": "medium",
+        "session_id": event.get("session_id"),
+        "seq": event.get("seq"),
+        "agent_id": body.get("agent_id"),
+        "adapter_id": body.get("adapter_id"),
+        "sender_id": body.get("sender_id"),
+        "call_id": body.get("call_id"),
+        "hook_id": body.get("hook_id"),
+        "reason": body.get("reason"),
+        "original_sha256": body.get("original_sha256"),
+        "original_size": body.get("original_size"),
+        "redacted_sha256": body.get("redacted_sha256"),
+        "redacted_size": body.get("redacted_size"),
+    }
+
+
+# ---------------------------------------------------------------
 # Entry point used by consumer.py
 # ---------------------------------------------------------------
 
@@ -362,6 +447,9 @@ def evaluate(event: Event, skill_dirs: Iterable[str]) -> list[Match]:
         detect_exec_fork_pairing,
         detect_binary_write,
         detect_chain_tamper,
+        detect_mcp_entry_refused,
+        detect_hook_refused,
+        detect_tool_output_redacted,
     ):
         result = fn(event)
         if result is not None:

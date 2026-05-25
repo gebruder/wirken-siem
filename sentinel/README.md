@@ -45,12 +45,12 @@ watchlist admin or `az sentinel watchlist-item create`.
 An empty watchlist makes the rule return zero rows; document the
 gap on first deploy.
 
-## Alarm log (Detection 6)
+## Alarm log (Detection 5)
 
 The audit-alarms log is a separate ingest path. Wire it into a
 Custom Log DCR named `Custom_WirkenAlarms_CL` with the same
 `SessionId` and `detail.seq` fields the legacy chain-broken row
-carries. The Detection 6 rule joins on
+carries. The Detection 5 rule joins on
 `(SessionId, Seq)` with a 60s window and promotes severity to
 Critical when no matching alarm row is found.
 

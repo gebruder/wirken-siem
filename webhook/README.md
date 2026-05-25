@@ -53,6 +53,6 @@ explicitly.
 pytest -q
 ```
 
-The fixtures under `tests/fixtures/` match the 1.3.x typed
-webhook envelope (lowercase `kind`, `session_id`, `seq`, ...) and
-the legacy webhook envelope for Detection 6.
+The fixtures under `tests/fixtures/` match the typed webhook
+envelope (lowercase `kind`, `session_id`, `seq`, ...) and the
+legacy webhook envelope (consumed by Detection 5).

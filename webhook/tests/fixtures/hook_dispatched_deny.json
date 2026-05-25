@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-05-11T12:31:00Z",
+  "session_id": "sess-1",
+  "seq": 22,
+  "kind": "hook_dispatched",
+  "trust": "system",
+  "event": {
+    "kind": "hook_dispatched",
+    "hook_id": "veto-shell-block",
+    "tool_name": "exec",
+    "agent_id": "default",
+    "adapter_id": "slack",
+    "sender_id": "U12345",
+    "decision": {
+      "kind": "deny",
+      "reason": "shell exec to external host blocked by policy"
+    }
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

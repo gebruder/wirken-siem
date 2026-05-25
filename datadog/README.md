@@ -73,7 +73,7 @@ prefix
 Empty table makes the monitor never fire; document this as a
 known gap on first deploy.
 
-## Alarm log for Detection 6
+## Alarm log for Detection 5
 
 Wire the wirken alarm log (default `~/.wirken/audit-alarms.log`)
 as a separate Datadog log source with `@ddsource:wirken-alarm-log`.
@@ -90,3 +90,6 @@ seen AND no matching alarm-log row within 60s).
 | Binary write                  | `monitors/binary_write.json`      |
 | Skill-dir exec                | `monitors/skill_dir_exec.json`    |
 | Chain tamper                  | `monitors/chain_tamper.json`      |
+| MCP entry refused             | `monitors/mcp_entry_refused.json` |
+| Veto hook deny or timeout     | `monitors/hook_refused.json`      |
+| Tool output redacted          | `monitors/tool_output_redacted.json` |

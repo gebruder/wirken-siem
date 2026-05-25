@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-05-11T12:32:00Z",
+  "session_id": "sess-1",
+  "seq": 23,
+  "kind": "hook_dispatched",
+  "trust": "system",
+  "event": {
+    "kind": "hook_dispatched",
+    "hook_id": "veto-secret-scanner",
+    "tool_name": "write_file",
+    "agent_id": "default",
+    "decision": {
+      "kind": "timeout"
+    }
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

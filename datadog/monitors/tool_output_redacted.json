@@ -1,0 +1,16 @@
+{
+  "name": "Wirken: tool output redacted by egress hook",
+  "type": "log alert",
+  "query": "logs(\"@ddsource:wirken @wirken.kind:tool_output_redacted\").index(\"main\").rollup(\"count\").last(\"15m\") > 0",
+  "message": "An egress hook replaced or refused bytes from a tool's output before the bytes entered the LLM conversation.\n\nDetection: tool_output_redacted (8)\nSeverity baseline: medium\n\nFields to pivot on: @wirken.session_id, @wirken.event.agent_id, @wirken.event.adapter_id, @wirken.event.sender_id, @wirken.event.call_id, @wirken.event.hook_id, @wirken.event.reason, @wirken.event.original_sha256, @wirken.event.original_size, @wirken.event.redacted_sha256, @wirken.event.redacted_size.\n\nPlaintext is not on the chain by design; @wirken.event.original_sha256 is the only on-chain reference to the bytes the tool produced.\n\n@security-team",
+  "tags": ["service:wirken", "detection:tool_output_redacted", "source:wirken-siem"],
+  "options": {
+    "thresholds": {"critical": 0},
+    "notify_audit": false,
+    "include_tags": true,
+    "evaluation_delay": 60,
+    "new_group_delay": 60,
+    "renotify_interval": 60
+  },
+  "priority": 3
+}

@@ -1,0 +1,41 @@
+id: 7c4f9c41-2a5e-4b8e-a3e0-d1c0a01a0007
+name: Wirken - veto hook denied or timed out
+description: |
+  Detection 7. Fires on HookDispatched rows whose decision.kind is
+  deny or timeout. Timeout is fail-closed in production (the tool
+  call is refused); it lands on the chain so reviewers distinguish
+  timeout from explicit deny.
+severity: Medium
+status: Available
+requiredDataConnectors: []
+queryFrequency: PT15M
+queryPeriod: PT15M
+triggerOperator: GreaterThan
+triggerThreshold: 0
+suppressionDuration: PT0M
+suppressionEnabled: false
+tactics:
+  - Execution
+relevantTechniques: []
+query: |
+  Custom_WirkenSession_CL
+  | where Kind == "hook_dispatched"
+  | extend body = parse_json(Event)
+  | extend decision_kind = tostring(body.decision.kind)
+  | where decision_kind in ("deny", "timeout")
+  | project
+      TimeGenerated,
+      SessionId,
+      Seq,
+      AgentId = tostring(body.agent_id),
+      AdapterId = tostring(body.adapter_id),
+      SenderId = tostring(body.sender_id),
+      HookId = tostring(body.hook_id),
+      ToolName = tostring(body.tool_name),
+      DecisionKind = decision_kind,
+      DecisionReason = tostring(body.decision.reason)
+entityMappings:
+  - entityType: AzureResource
+    fieldMappings:
+      - identifier: ResourceId
+        columnName: SessionId

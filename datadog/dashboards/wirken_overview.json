@@ -1,11 +1,11 @@
 {
   "title": "Wirken audit overview",
-  "description": "Five-detection dashboard for the Wirken 1.3.x audit feed. Each tile maps one-to-one to a saved detection.",
+  "description": "Eight-detection dashboard for the Wirken audit feed. Each tile maps one-to-one to a saved detection.",
   "widgets": [
     {
       "definition": {
         "type": "note",
-        "content": "**Wirken-SIEM detection overview**\n\n- Shell-driven outbound fetch (Detection 1)\n- Exec fork pairing (Detection 2)\n- Binary write (Detection 3)\n- Skill-dir-resident binary (Detection 4)\n- Chain tamper (Detection 6)\n\nDetection 5 corresponds to a wirken code gap (`Action::SkillInstall`) and is intentionally absent.",
+        "content": "**Wirken-SIEM detection overview**\n\n- Shell-driven outbound fetch (Detection 1)\n- Exec fork pairing (Detection 2)\n- Binary write (Detection 3)\n- Skill-dir-resident binary (Detection 4)\n- Chain tamper (Detection 5)\n- MCP entry refused (Detection 6)\n- Veto hook denied or timed out (Detection 7)\n- Tool output redacted (Detection 8)",
         "background_color": "yellow",
         "font_size": "14",
         "text_align": "left",
@@ -107,7 +107,7 @@
     {
       "definition": {
         "type": "timeseries",
-        "title": "Chain tamper (Detection 6)",
+        "title": "Chain tamper (Detection 5)",
         "requests": [
           {
             "response_format": "timeseries",
@@ -119,6 +119,75 @@
                 "compute": {"aggregation": "count"},
                 "search": {
                   "query": "@ddsource:wirken @wirken.action:audit.chain_broken"
+                }
+              }
+            ],
+            "display_type": "line"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "MCP entry refused (Detection 6)",
+        "requests": [
+          {
+            "response_format": "timeseries",
+            "queries": [
+              {
+                "data_source": "logs",
+                "name": "query1",
+                "indexes": ["main"],
+                "compute": {"aggregation": "count"},
+                "search": {
+                  "query": "@ddsource:wirken @wirken.kind:mcp_entry_refused"
+                }
+              }
+            ],
+            "display_type": "line"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "Veto hook deny or timeout (Detection 7)",
+        "requests": [
+          {
+            "response_format": "timeseries",
+            "queries": [
+              {
+                "data_source": "logs",
+                "name": "query1",
+                "indexes": ["main"],
+                "compute": {"aggregation": "count"},
+                "search": {
+                  "query": "@ddsource:wirken @wirken.kind:hook_dispatched (@wirken.event.decision.kind:deny OR @wirken.event.decision.kind:timeout)"
+                }
+              }
+            ],
+            "display_type": "line"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "Tool output redacted (Detection 8)",
+        "requests": [
+          {
+            "response_format": "timeseries",
+            "queries": [
+              {
+                "data_source": "logs",
+                "name": "query1",
+                "indexes": ["main"],
+                "compute": {"aggregation": "count"},
+                "search": {
+                  "query": "@ddsource:wirken @wirken.kind:tool_output_redacted"
                 }
               }
             ],

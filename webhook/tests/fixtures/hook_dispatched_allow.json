@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-05-11T12:33:00Z",
+  "session_id": "sess-1",
+  "seq": 24,
+  "kind": "hook_dispatched",
+  "trust": "system",
+  "event": {
+    "kind": "hook_dispatched",
+    "hook_id": "observe-only",
+    "tool_name": "exec",
+    "agent_id": "default",
+    "decision": {
+      "kind": "allow"
+    }
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

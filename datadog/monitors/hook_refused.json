@@ -1,0 +1,16 @@
+{
+  "name": "Wirken: veto hook denied or timed out",
+  "type": "log alert",
+  "query": "logs(\"@ddsource:wirken @wirken.kind:hook_dispatched (@wirken.event.decision.kind:deny OR @wirken.event.decision.kind:timeout)\").index(\"main\").rollup(\"count\").last(\"15m\") > 0",
+  "message": "A registered veto hook refused a tool call or hit its timeout. In production posture, timeout is fail-closed (the tool call is refused) and lands on the chain so reviewers distinguish timeout from explicit deny.\n\nDetection: hook_refused (7)\nSeverity baseline: medium\n\nFields to pivot on: @wirken.session_id, @wirken.event.agent_id, @wirken.event.adapter_id, @wirken.event.sender_id, @wirken.event.hook_id, @wirken.event.tool_name, @wirken.event.decision.kind, @wirken.event.decision.reason.\n\n@security-team",
+  "tags": ["service:wirken", "detection:hook_refused", "source:wirken-siem"],
+  "options": {
+    "thresholds": {"critical": 0},
+    "notify_audit": false,
+    "include_tags": true,
+    "evaluation_delay": 60,
+    "new_group_delay": 60,
+    "renotify_interval": 60
+  },
+  "priority": 3
+}
