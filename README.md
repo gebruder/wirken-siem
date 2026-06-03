@@ -10,11 +10,15 @@ binary.
 
 | wirken-siem | Wirken audit schema |
 |-------------|---------------------|
-| 0.1         | 1.3.x – 1.7.x       |
+| 0.1         | 1.3.x – 1.8.x       |
 
 Every audit-schema change from 1.4.0 through 1.7.2 has been
 field-additive (`#[serde(default)]` on new fields, new variants
-sitting alongside existing ones). Existing detection content in
+sitting alongside existing ones). Releases 1.7.3 through 1.8.0
+introduced no audit-schema change: 1.8.0 added a `wasm_skill_call`
+value to the `Action` label vocabulary (WASM-skill calls now gate at
+Tier 3), but it rides the existing `PermissionDenied` event and adds
+no field or `SessionEvent` variant. Existing detection content in
 this repo continues to fire unmodified across the range.
 
 `SessionEvent` variants added since 1.4.x. Detections 6, 7, and 8
