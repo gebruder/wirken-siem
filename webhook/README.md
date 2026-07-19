@@ -38,9 +38,10 @@ pins this invariant.
 
 ## Rules
 
-`rules.py` exports five pure detection functions plus
-`evaluate(event, skill_dirs) -> list[match]`. Each rule consumes
-one webhook event dict and returns `Optional[Match]`.
+`rules.py` exports eight pure detection functions (detections 1-8)
+plus `evaluate(event, skill_dirs) -> list[match]`. Each rule consumes
+one webhook event dict and returns `Optional[Match]`. Detection 9 is
+not ported to the webhook consumer.
 
 Detection 4 reads the operator-supplied `--skill-dirs` list; an
 empty list disables it. The consumer logs a one-line note at

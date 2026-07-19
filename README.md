@@ -106,8 +106,9 @@ target.
 - `sentinel/` analytics rule YAML and workbook JSON; ingestion via
   DCR streams `Custom-WirkenAudit_CL` and `Custom-WirkenSession_CL`.
 - `webhook/` reference Python consumer that verifies the
-  `X-Wirken-Signature` HMAC over the raw POST body, then runs the
-  five rules in-process.
+  `X-Wirken-Signature` HMAC over the raw POST body, then runs
+  detections 1-8 in-process; detection 9 is not ported to the
+  webhook consumer.
 
 ## Operating notes
 
