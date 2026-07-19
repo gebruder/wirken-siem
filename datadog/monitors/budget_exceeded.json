@@ -1,0 +1,16 @@
+{
+  "name": "Wirken: per-agent budget exceeded",
+  "type": "log alert",
+  "query": "logs(\"@ddsource:wirken @wirken.kind:budget_exceeded\").index(\"main\").rollup(\"count\").last(\"15m\") > 0",
+  "message": "A Wirken agent reached its per-agent spend ceiling for the current budget window.\n\nDetection: budget_exceeded (10)\nSeverity baseline: medium\n\n`@wirken.event.action` is `blocked` (the LLM call was refused, an enforced stop) or `alerted` (the ceiling was crossed and the call proceeded). Pivot on @wirken.event.agent_id, @wirken.event.window, @wirken.event.window_spend_usd_micros, @wirken.event.ceiling_usd_micros.\n\nEmitted by the wirken runtime's pre-call budget gate. Requires audit schema 1.12.0 (the budget_exceeded event) and the default budget_exceeded forwarding.\n\n@security-team",
+  "tags": ["service:wirken", "detection:budget_exceeded", "source:wirken-siem"],
+  "options": {
+    "thresholds": {"critical": 0},
+    "notify_audit": true,
+    "include_tags": true,
+    "evaluation_delay": 60,
+    "new_group_delay": 60,
+    "renotify_interval": 30
+  },
+  "priority": 3
+}

@@ -67,3 +67,4 @@ Critical when no matching alarm row is found.
 | `hook_refused.yaml`             | Medium            | Custom_WirkenSession_CL     |
 | `tool_output_redacted.yaml`     | Medium            | Custom_WirkenSession_CL     |
 | `agent_cost_anomaly.yaml`       | Medium            | Custom_WirkenSession_CL     |
+| `budget_exceeded.yaml`          | Medium            | Custom_WirkenSession_CL     |

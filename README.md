@@ -11,15 +11,21 @@ binary.
 | wirken-siem | Wirken audit schema |
 |-------------|---------------------|
 | 0.1         | 1.3.x – 1.8.x       |
+| 0.2         | 1.3.x – 1.12.x      |
 
-Every audit-schema change from 1.4.0 through 1.7.2 has been
-field-additive (`#[serde(default)]` on new fields, new variants
-sitting alongside existing ones). Releases 1.7.3 through 1.8.0
-introduced no audit-schema change: 1.8.0 added a `wasm_skill_call`
-value to the `Action` label vocabulary (WASM-skill calls now gate at
-Tier 3), but it rides the existing `PermissionDenied` event and adds
-no field or `SessionEvent` variant. Existing detection content in
-this repo continues to fire unmodified across the range.
+wirken-siem 0.1 shipped detections 1-8 against audit schema 1.3.x
+through 1.8.x. 0.2 adds detections 9 (per-agent cost anomaly) and 10
+(per-agent budget exceeded) and extends support through 1.12.x.
+
+Every audit-schema change from 1.4.0 through 1.12.0 has been
+forward-compatible (`#[serde(default)]` on new fields, new variants
+sitting alongside existing ones): 1.8.0 added a `wasm_skill_call`
+value to the `Action` label vocabulary (it rides the existing
+`PermissionDenied` event), 1.10.0 added the `http_request` typed
+variant, and 1.12.0 added the `budget_exceeded` typed variant plus
+`sender_id` on the `LlmRequest` and `LlmResponse` variants. Existing
+detection content in this repo continues to fire unmodified across the
+range.
 
 `SessionEvent` variants added since 1.4.x. Detections 6, 7, and 8
 consume `McpEntryRefused`, `HookDispatched`, and
@@ -44,6 +50,11 @@ Fields added to existing variants since 1.4.x:
   `total_cost_usd_micros`, `cache_creation_input_tokens`,
   `cache_read_input_tokens`.
 - `HttpFetch`: `expansion_id`, `skill_name`.
+- `LlmRequest` / `LlmResponse`: `sender_id` (1.12.0), the platform-side
+  human the call is on behalf of; `None` for operator-originated
+  sessions. Carries the originating principal across the LLM call
+  boundary for correlation with the sibling `UserMessage` / `ToolResult`
+  rows.
 
 ### Detection 9 minimum
 
@@ -56,8 +67,19 @@ row whose (provider, model) pair is absent from the pricing table
 carries no cost and is invisible to the detection. The logic is
 baseline-relative, so it does not fire for an agent that is expensive
 from its first hour: an agent compromised or misconfigured on day one
-reads as its own baseline. See `wirken/docs/design/budget-enforcement.md`
-for the absolute-ceiling complement.
+reads as its own baseline. See `wirken/docs/cost-monitoring.md`
+(Enforcement) and detection 10 for the absolute-ceiling complement,
+now shipped.
+
+### Detection 10 minimum
+
+Detection 10 (per-agent budget exceeded) requires the `budget_exceeded`
+event added in audit schema 1.12.0. Unlike detection 9 it needs no
+forwarder opt-in: `BudgetExceeded` is forwarded by default. It fires on
+any breach the wirken runtime records; `action` distinguishes a block
+(the call was refused) from an alert (the call proceeded). The wirken
+runtime does the ceiling comparison, so this detection only surfaces
+the event.
 
 ## Field index
 
@@ -75,7 +97,8 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `McpEntryRefused`      | `server_name`, `reason` (`signature_invalid` / `unsigned` / `signer_key_missing` / `signer_key_decode_failed` / `delegation_required`) | 6 |
 | `HookDispatched`       | `hook_id`, `tool_name`, `agent_id`, `adapter_id?`, `sender_id?`, `decision.kind` (`allow` / `deny` / `timeout`), `decision.reason?` | 7 |
 | `ToolOutputRedacted`   | `call_id`, `hook_id`, `agent_id`, `adapter_id?`, `sender_id?`, `reason`, `original_sha256`, `original_size`, `redacted_sha256`, `redacted_size` | 8 |
-| `LlmResponse`          | `agent_id`, `credential_id?`, `total_cost_usd_micros?`, `input_cost_usd_micros?`, `output_cost_usd_micros?` | 9 |
+| `LlmResponse`          | `agent_id`, `credential_id?`, `sender_id?`, `total_cost_usd_micros?`, `input_cost_usd_micros?`, `output_cost_usd_micros?` | 9 |
+| `BudgetExceeded`       | `agent_id`, `credential_id?`, `action` (`alerted` / `blocked`), `window`, `window_spend_usd_micros`, `ceiling_usd_micros` | 10 |
 
 Row metadata on every typed event: `session_id`, `seq`, `ts`,
 `trust`, `kind`. The forwarder wraps each row in a per-target
@@ -95,6 +118,7 @@ target.
 | 7  | Veto hook denied or timed out      | `HookDispatched`               | medium            |
 | 8  | Tool output redacted by egress hook | `ToolOutputRedacted`          | medium            |
 | 9  | Per-agent LLM cost anomaly         | `LlmResponse`                  | medium            |
+| 10 | Per-agent budget exceeded          | `BudgetExceeded`               | medium            |
 
 ## Layout
 

@@ -1,0 +1,39 @@
+id: 7c4f9c41-2a5e-4b8e-a3e0-d1c0a01a0010
+name: Wirken - per-agent budget exceeded
+description: |
+  Detection 10. Fires on any BudgetExceeded row emitted by the wirken
+  runtime's pre-call budget gate. `action` is `blocked` (the LLM call
+  was refused, an enforced stop) or `alerted` (the ceiling was crossed
+  and the call proceeded). Requires audit schema 1.12.0 (the
+  budget_exceeded event) and the default budget_exceeded forwarding.
+severity: Medium
+status: Available
+requiredDataConnectors: []
+queryFrequency: PT15M
+queryPeriod: PT15M
+triggerOperator: GreaterThan
+triggerThreshold: 0
+suppressionDuration: PT0M
+suppressionEnabled: false
+tactics:
+  - Impact
+relevantTechniques:
+  - T1496
+query: |
+  Custom_WirkenSession_CL
+  | where Kind == "budget_exceeded"
+  | extend body = parse_json(Event)
+  | project
+      TimeGenerated,
+      SessionId,
+      Seq,
+      AgentId,
+      Action = tostring(body.action),
+      Window = tostring(body.window),
+      WindowSpendUsdMicros = tolong(body.window_spend_usd_micros),
+      CeilingUsdMicros = tolong(body.ceiling_usd_micros)
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AgentId
