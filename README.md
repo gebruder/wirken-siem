@@ -45,6 +45,20 @@ Fields added to existing variants since 1.4.x:
   `cache_read_input_tokens`.
 - `HttpFetch`: `expansion_id`, `skill_name`.
 
+### Detection 9 minimum
+
+Detection 9 (per-agent cost anomaly) requires the `LlmResponse` cost
+fields added in audit schema 1.6.0, plus the forwarder opt-in
+documented in `wirken/docs/cost-monitoring.md`. `LlmResponse` is
+excluded from typed forwarding by default; the detection sees nothing
+until an operator adds `llm_response` to `typed_include_variants`. A
+row whose (provider, model) pair is absent from the pricing table
+carries no cost and is invisible to the detection. The logic is
+baseline-relative, so it does not fire for an agent that is expensive
+from its first hour: an agent compromised or misconfigured on day one
+reads as its own baseline. See `wirken/docs/design/budget-enforcement.md`
+for the absolute-ceiling complement.
+
 ## Field index
 
 The detections read from these typed `SessionEvent` variants and
@@ -61,6 +75,7 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `McpEntryRefused`      | `server_name`, `reason` (`signature_invalid` / `unsigned` / `signer_key_missing` / `signer_key_decode_failed` / `delegation_required`) | 6 |
 | `HookDispatched`       | `hook_id`, `tool_name`, `agent_id`, `adapter_id?`, `sender_id?`, `decision.kind` (`allow` / `deny` / `timeout`), `decision.reason?` | 7 |
 | `ToolOutputRedacted`   | `call_id`, `hook_id`, `agent_id`, `adapter_id?`, `sender_id?`, `reason`, `original_sha256`, `original_size`, `redacted_sha256`, `redacted_size` | 8 |
+| `LlmResponse`          | `agent_id`, `credential_id?`, `total_cost_usd_micros?`, `input_cost_usd_micros?`, `output_cost_usd_micros?` | 9 |
 
 Row metadata on every typed event: `session_id`, `seq`, `ts`,
 `trust`, `kind`. The forwarder wraps each row in a per-target
@@ -79,6 +94,7 @@ target.
 | 6  | MCP entry refused at proxy load    | `McpEntryRefused`              | high              |
 | 7  | Veto hook denied or timed out      | `HookDispatched`               | medium            |
 | 8  | Tool output redacted by egress hook | `ToolOutputRedacted`          | medium            |
+| 9  | Per-agent LLM cost anomaly         | `LlmResponse`                  | medium            |
 
 ## Layout
 

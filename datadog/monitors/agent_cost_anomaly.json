@@ -1,0 +1,16 @@
+{
+  "name": "Wirken: per-agent LLM cost anomaly",
+  "type": "query alert",
+  "query": "avg(last_1h):( sum:wirken.llm.cost_usd_micros{*} by {agent_id}.rollup(sum, 3600) ) / ( moving_rollup(sum:wirken.llm.cost_usd_micros{*} by {agent_id}.rollup(sum, 3600), 604800, 'avg') ) > 3",
+  "message": "A Wirken agent's LLM spend in the last hour exceeded 3x its own trailing 7-day mean hourly spend.\n\nDetection: agent_cost_anomaly (9)\nSeverity baseline: medium\n\nThe numerator is the agent's spend in the most recent 1-hour bucket; the denominator is the trailing 7-day moving average of that agent's hourly spend, which is the agent's own baseline. The ratio breaching 3 means a step change in this agent's spend rate, not an absolute dollar threshold.\n\nTunables and defaults: the `.rollup(sum, 3600)` bucket is the window (1h, catches a step change within an hour); the `moving_rollup(..., 604800, 'avg')` lookback is the baseline period (7d, smooths daily and weekly cycles); the `> 3` is the multiplier (3x normal spend is a clear step). Raise the multiplier to reduce sensitivity; widen the window to smooth bursty agents.\n\nThis monitor reads the log-based metric `wirken.llm.cost_usd_micros` (measure `@wirken.event.total_cost_usd_micros`, tagged by agent_id); see datadog/README.md for the metric definition. Requires audit schema 1.6.0+ cost fields and the LlmResponse forwarder opt-in.\n\nAgents with under a day of history read a thin baseline; treat their first alerts as advisory.\n\n@security-team",
+  "tags": ["service:wirken", "detection:agent_cost_anomaly", "source:wirken-siem"],
+  "options": {
+    "thresholds": {"critical": 3, "warning": 2},
+    "notify_audit": false,
+    "include_tags": true,
+    "evaluation_delay": 900,
+    "new_group_delay": 60,
+    "renotify_interval": 0
+  },
+  "priority": 3
+}

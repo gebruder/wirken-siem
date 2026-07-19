@@ -58,6 +58,28 @@ Configuration > Pipelines). The detection content here does not
 ship the pipeline JSON because it depends on per-org parsing
 infra; the field names above are the contract.
 
+## Required log-based metric (Detection 9)
+
+Detection 9 (`monitors/agent_cost_anomaly.json`) reads a log-based
+metric, not raw logs. Define it under Logs > Configuration >
+Generate Metrics:
+
+- Name: `wirken.llm.cost_usd_micros`
+- Filter: `@ddsource:wirken @wirken.kind:llm_response`
+- Measure: `@wirken.event.total_cost_usd_micros` (aggregate: sum)
+- Group-by tag: `agent_id` from `@wirken.event.agent_id`
+  (optionally `credential_id` from `@wirken.event.credential_id`)
+
+The monitor divides each agent's last-hour spend by the trailing
+7-day moving average of its hourly spend and alerts on a 3x breach.
+The measure is `total_cost_usd_micros`, the cost the forwarder
+computes once per call; do not sum input and output client-side.
+The monitor query is a template: validate the `moving_rollup` and
+rollup tuning against your org's data volume before enabling.
+Requires the `llm_response` forwarder opt-in
+(`wirken/docs/cost-monitoring.md`) and audit schema 1.6.0+ cost
+fields.
+
 ## Reference table: `wirken_skill_dirs`
 
 Detection 4 reads from a Datadog reference table named
@@ -93,3 +115,4 @@ seen AND no matching alarm-log row within 60s).
 | MCP entry refused             | `monitors/mcp_entry_refused.json` |
 | Veto hook deny or timeout     | `monitors/hook_refused.json`      |
 | Tool output redacted          | `monitors/tool_output_redacted.json` |
+| Per-agent LLM cost anomaly    | `monitors/agent_cost_anomaly.json` |

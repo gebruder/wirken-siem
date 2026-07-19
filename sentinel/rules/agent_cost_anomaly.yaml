@@ -1,0 +1,65 @@
+id: 7c4f9c41-2a5e-4b8e-a3e0-d1c0a01a0009
+name: Wirken - per-agent LLM cost anomaly
+description: |
+  Detection 9. Buckets llm_response cost into 1-hour windows per
+  agent_id, compares the most recent complete hour to that agent's
+  mean hourly spend over the trailing 7 days, and fires when the
+  recent hour exceeds multiplier * baseline (default 3x). Reads
+  total_cost_usd_micros, the cost the forwarder computes once at
+  emit time; rows with no cost (provider/model absent from the
+  pricing table) carry no total and are dropped. Tunables and
+  defaults: win (window, 1h), lookback (baseline period, 7d),
+  multiplier (breach factor, 3.0), min_baseline_buckets (cold-start
+  suppression, 24). Requires audit schema 1.6.0+ cost fields and the
+  LlmResponse forwarder opt-in.
+severity: Medium
+status: Available
+requiredDataConnectors: []
+queryFrequency: PT1H
+queryPeriod: P7D
+triggerOperator: GreaterThan
+triggerThreshold: 0
+suppressionDuration: PT0M
+suppressionEnabled: false
+tactics:
+  - Impact
+relevantTechniques:
+  - T1496
+query: |
+  let win = 1h;
+  let lookback = 7d;
+  let multiplier = 3.0;
+  let min_baseline_buckets = 24;
+  let buckets =
+      Custom_WirkenSession_CL
+      | where Kind == "llm_response"
+      | where TimeGenerated > ago(lookback)
+      | extend body = parse_json(Event)
+      | extend AgentId = tostring(body.agent_id), CostMicros = tolong(body.total_cost_usd_micros)
+      | where isnotnull(CostMicros)
+      | summarize BucketMicros = sum(CostMicros) by AgentId, Bucket = bin(TimeGenerated, win);
+  let latest = toscalar(buckets | summarize max(Bucket));
+  let baseline =
+      buckets
+      | where Bucket < latest
+      | summarize BaselineMicros = avg(BucketMicros), BaselineBuckets = count() by AgentId;
+  buckets
+  | where Bucket == latest
+  | join kind=inner baseline on AgentId
+  | where BaselineBuckets >= min_baseline_buckets and BaselineMicros > 0 and BucketMicros > multiplier * BaselineMicros
+  | extend RecentUsd = round(BucketMicros / 1000000.0, 4),
+           BaselineUsd = round(BaselineMicros / 1000000.0, 4),
+           BreachRatio = round(todouble(BucketMicros) / BaselineMicros, 2)
+  | project
+      TimeGenerated = Bucket,
+      AgentId,
+      RecentUsd,
+      BaselineUsd,
+      BreachRatio,
+      Multiplier = multiplier,
+      BaselineBuckets
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AgentId
