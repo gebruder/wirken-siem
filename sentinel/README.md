@@ -63,4 +63,7 @@ Critical when no matching alarm row is found.
 | `binary_write.yaml`             | High              | Custom_WirkenSession_CL     |
 | `skill_dir_exec.yaml`           | High              | Custom_WirkenSession_CL     |
 | `chain_tamper.yaml`             | High / Critical   | Custom_WirkenAudit_CL + Alarms |
+| `mcp_entry_refused.yaml`        | High              | Custom_WirkenSession_CL     |
+| `hook_refused.yaml`             | Medium            | Custom_WirkenSession_CL     |
+| `tool_output_redacted.yaml`     | Medium            | Custom_WirkenSession_CL     |
 | `agent_cost_anomaly.yaml`       | Medium            | Custom_WirkenSession_CL     |
