@@ -11,20 +11,23 @@ binary.
 | wirken-siem | Wirken audit schema |
 |-------------|---------------------|
 | 0.1         | 1.3.x – 1.8.x       |
-| 0.2         | 1.3.x – 1.12.x      |
+| 0.2         | 1.3.x – 1.15.x      |
 
 wirken-siem 0.1 shipped detections 1-8 against audit schema 1.3.x
 through 1.8.x. 0.2 adds detections 9 (per-agent cost anomaly) and 10
-(per-agent budget exceeded) and extends support through 1.12.x.
+(per-agent budget exceeded) and extends support through 1.15.x.
 
-Every audit-schema change from 1.4.0 through 1.12.0 has been
+Every audit-schema change from 1.4.0 through 1.15.0 has been
 forward-compatible (`#[serde(default)]` on new fields, new variants
 sitting alongside existing ones): 1.8.0 added a `wasm_skill_call`
 value to the `Action` label vocabulary (it rides the existing
 `PermissionDenied` event), 1.10.0 added the `http_request` typed
-variant, and 1.12.0 added the `budget_exceeded` typed variant plus
-`sender_id` on the `LlmRequest` and `LlmResponse` variants. Existing
-detection content in this repo continues to fire unmodified across the
+variant, 1.12.0 added the `budget_exceeded` typed variant plus
+`sender_id` on the `LlmRequest` and `LlmResponse` variants, 1.14.0
+added the `sandbox_egress_denied` typed variant, and 1.15.0 added the
+`memory_entry_written` and `cross_channel_memory_read` typed variants
+plus a `cross_channel_memory_read` value in the `Action` label
+vocabulary. Existing detection content fires unmodified across the
 range.
 
 `SessionEvent` variants added since 1.4.x. Detections 6, 7, and 8
@@ -40,6 +43,9 @@ consume `McpEntryRefused`, `HookDispatched`, and
 - `SessionScopedApprovalsCleared` (session-scoped approval lifecycle)
 - `ChainHead` (gateway-keyed signature over chain ranges)
 - `Compaction` (context-engine compaction extracts)
+- `SandboxEgressDenied` (1.14.0, sandbox egress proxy refusals)
+- `MemoryEntryWritten`, `CrossChannelMemoryRead` (1.15.0,
+  cross-channel memory provenance and trust-zone crossings)
 
 Fields added to existing variants since 1.4.x:
 
@@ -99,6 +105,9 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `ToolOutputRedacted`   | `call_id`, `hook_id`, `agent_id`, `adapter_id?`, `sender_id?`, `reason`, `original_sha256`, `original_size`, `redacted_sha256`, `redacted_size` | 8 |
 | `LlmResponse`          | `agent_id`, `credential_id?`, `sender_id?`, `total_cost_usd_micros?`, `input_cost_usd_micros?`, `output_cost_usd_micros?` | 9 |
 | `BudgetExceeded`       | `agent_id`, `credential_id?`, `action` (`alerted` / `blocked`), `window`, `window_spend_usd_micros`, `ceiling_usd_micros` | 10 |
+| `SandboxEgressDenied`  | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `host`, `port`, `reason` (`mode_none` / `not_allowed` / `ip_literal` / `port_not_allowed` / `method_not_allowed` / `malformed` / `resolution_failed`), `mode` (`none` / `allowlist` / `open`) | (none here; reserved) |
+| `MemoryEntryWritten`   | `agent_id`, `channel`, `adapter_id`, `sender_id`, `entry_id`, `origin_session_id` | (none here; reserved) |
+| `CrossChannelMemoryRead` | `agent_id`, `adapter_id?`, `sender_id?`, `from_channel`, `to_channel`, `entry_count` | (none here; reserved) |
 
 Row metadata on every typed event: `session_id`, `seq`, `ts`,
 `trust`, `kind`. The forwarder wraps each row in a per-target
