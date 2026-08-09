@@ -11,11 +11,11 @@ binary.
 | wirken-siem | Wirken audit schema |
 |-------------|---------------------|
 | 0.1         | 1.3.x – 1.8.x       |
-| 0.2         | 1.3.x – 1.15.x      |
+| 0.2         | 1.3.x – 1.16.x      |
 
 wirken-siem 0.1 shipped detections 1-8 against audit schema 1.3.x
 through 1.8.x. 0.2 adds detections 9 (per-agent cost anomaly) and 10
-(per-agent budget exceeded) and extends support through 1.15.x.
+(per-agent budget exceeded) and extends support through 1.16.x.
 
 Every audit-schema change from 1.4.0 through 1.15.0 has been
 forward-compatible (`#[serde(default)]` on new fields, new variants
@@ -23,12 +23,12 @@ sitting alongside existing ones): 1.8.0 added a `wasm_skill_call`
 value to the `Action` label vocabulary (it rides the existing
 `PermissionDenied` event), 1.10.0 added the `http_request` typed
 variant, 1.12.0 added the `budget_exceeded` typed variant plus
-`sender_id` on the `LlmRequest` and `LlmResponse` variants, 1.14.0
-added the `sandbox_egress_denied` typed variant, and 1.15.0 added the
-`memory_entry_written` and `cross_channel_memory_read` typed variants
-plus a `cross_channel_memory_read` value in the `Action` label
-vocabulary. Existing detection content fires unmodified across the
-range.
+`sender_id` on the `LlmRequest` and `LlmResponse` variants, 1.15.0
+added the `memory_entry_written` and `cross_channel_memory_read` typed
+variants plus a `cross_channel_memory_read` value in the `Action` label
+vocabulary, and 1.16.0 added the `sandbox_egress_verdict` and
+`sandbox_egress_unsupported` typed variants. Existing detection content
+fires unmodified across the range.
 
 `SessionEvent` variants added since 1.4.x. Detections 6, 7, and 8
 consume `McpEntryRefused`, `HookDispatched`, and
@@ -43,7 +43,10 @@ consume `McpEntryRefused`, `HookDispatched`, and
 - `SessionScopedApprovalsCleared` (session-scoped approval lifecycle)
 - `ChainHead` (gateway-keyed signature over chain ranges)
 - `Compaction` (context-engine compaction extracts)
-- `SandboxEgressDenied` (1.14.0, sandbox egress proxy refusals)
+- `SandboxEgressVerdict` (1.16.0, one row per sandbox egress request,
+  allow or deny, carrying the confidentiality basis it was decided on)
+- `SandboxEgressUnsupported` (1.16.0, egress configured on a platform
+  with no decision-broker transport, so the exec was refused)
 - `MemoryEntryWritten`, `CrossChannelMemoryRead` (1.15.0,
   cross-channel memory provenance and trust-zone crossings)
 
@@ -105,9 +108,14 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `ToolOutputRedacted`   | `call_id`, `hook_id`, `agent_id`, `adapter_id?`, `sender_id?`, `reason`, `original_sha256`, `original_size`, `redacted_sha256`, `redacted_size` | 8 |
 | `LlmResponse`          | `agent_id`, `credential_id?`, `sender_id?`, `total_cost_usd_micros?`, `input_cost_usd_micros?`, `output_cost_usd_micros?` | 9 |
 | `BudgetExceeded`       | `agent_id`, `credential_id?`, `action` (`alerted` / `blocked`), `window`, `window_spend_usd_micros`, `ceiling_usd_micros` | 10 |
-| `SandboxEgressDenied`  | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `host`, `port`, `reason` (`mode_none` / `not_allowed` / `ip_literal` / `port_not_allowed` / `method_not_allowed` / `malformed` / `resolution_failed`), `mode` (`none` / `allowlist` / `open`) | (none here; reserved) |
+| `SandboxEgressVerdict` | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `host`, `port`, `allowed`, `reason?` (`mode_none` / `not_allowed` / `ip_literal` / `port_not_allowed` / `method_not_allowed` / `malformed` / `resolution_failed` / `sensitivity_refused`), `mode` (`none` / `allowlist` / `open`), `sensitivity_basis[]`, `escalated` | (none here; reserved) |
+| `SandboxEgressUnsupported` | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `mode` | (none here; reserved) |
 | `MemoryEntryWritten`   | `agent_id`, `channel`, `adapter_id`, `sender_id`, `entry_id`, `origin_session_id` | (none here; reserved) |
 | `CrossChannelMemoryRead` | `agent_id`, `adapter_id?`, `sender_id?`, `from_channel`, `to_channel`, `entry_count` | (none here; reserved) |
+
+`SandboxEgressVerdict` is emitted for every request the proxy decides, allow included, not only refusals. An allow row carries the same `sensitivity_basis`, which is what lets a detection assert that a connection was permitted after a given set of reads rather than seeing only what was turned away. Expect one row per proxied CONNECT.
+
+`sandbox_egress_denied` appears in no released binary: it existed in the 1.14.0 and 1.15.0 trees, neither of which produced release artifacts, and was replaced before the next release. No consumer needs to handle it.
 
 Row metadata on every typed event: `session_id`, `seq`, `ts`,
 `trust`, `kind`. The forwarder wraps each row in a per-target
