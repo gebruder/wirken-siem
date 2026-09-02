@@ -11,13 +11,13 @@ binary.
 | wirken-siem | Wirken audit schema |
 |-------------|---------------------|
 | 0.1         | 1.3.x – 1.8.x       |
-| 0.2         | 1.3.x – 1.16.x      |
+| 0.2         | 1.3.x – 1.19.x      |
 
 wirken-siem 0.1 shipped detections 1-8 against audit schema 1.3.x
 through 1.8.x. 0.2 adds detections 9 (per-agent cost anomaly) and 10
-(per-agent budget exceeded) and extends support through 1.16.x.
+(per-agent budget exceeded) and extends support through 1.19.x.
 
-Every audit-schema change from 1.4.0 through 1.15.0 has been
+Every audit-schema change from 1.4.0 through 1.19.0 has been
 forward-compatible (`#[serde(default)]` on new fields, new variants
 sitting alongside existing ones): 1.8.0 added a `wasm_skill_call`
 value to the `Action` label vocabulary (it rides the existing
@@ -27,7 +27,11 @@ variant, 1.12.0 added the `budget_exceeded` typed variant plus
 added the `memory_entry_written` and `cross_channel_memory_read` typed
 variants plus a `cross_channel_memory_read` value in the `Action` label
 vocabulary, and 1.16.0 added the `sandbox_egress_verdict` and
-`sandbox_egress_unsupported` typed variants. Existing detection content
+`sandbox_egress_unsupported` typed variants. 1.17.0 and 1.18.0 changed
+the audit schema not at all. 1.19.0 added the `import_started`,
+`import_completed`, `imported_chat_read` and `imported_chat_searched`
+typed variants, plus `imported_chat_read` and `imported_chat_search`
+values in the `Action` label vocabulary. Existing detection content
 fires unmodified across the range.
 
 `SessionEvent` variants added since 1.4.x. Detections 6, 7, and 8
@@ -112,10 +116,22 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `SandboxEgressUnsupported` | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `mode` | (none here; reserved) |
 | `MemoryEntryWritten`   | `agent_id`, `channel`, `adapter_id`, `sender_id`, `entry_id`, `origin_session_id` | (none here; reserved) |
 | `CrossChannelMemoryRead` | `agent_id`, `adapter_id?`, `sender_id?`, `from_channel`, `to_channel`, `entry_count` | (none here; reserved) |
+| `ImportStarted`        | `actor`, `source_id`, `provider`, `source_account`, `archive_sha256` | (none here; reserved) |
+| `ImportCompleted`      | `actor`, `source_id`, `provider`, `source_account`, `archive_sha256`, `added`, `updated`, `unchanged`, `unorderable`, `skipped` | (none here; reserved) |
+| `ImportedChatRead`     | `agent_id`, `adapter_id?`, `sender_id?`, `source_id`, `source_account?`, `conversation_uuid`, `message_count` | (none here; reserved) |
+| `ImportedChatSearched` | `agent_id`, `adapter_id?`, `sender_id?`, `source_id?`, `outcome` (`hits` / `empty` / `refused`), `match_count`, `query_digest?` | (none here; reserved) |
 
 `SandboxEgressVerdict` is emitted for every request the proxy decides, allow included, not only refusals. An allow row carries the same `sensitivity_basis`, which is what lets a detection assert that a connection was permitted after a given set of reads rather than seeing only what was turned away. Expect one row per proxied CONNECT.
 
 `sandbox_egress_denied` appears in no released binary: it existed in the 1.14.0 and 1.15.0 trees, neither of which produced release artifacts, and was replaced before the next release. No consumer needs to handle it.
+
+An import is an operator action, not an agent turn, so `ImportStarted` and `ImportCompleted` attribute differently from every other typed variant: the extractor puts `actor` in the sender position and leaves the agent and adapter columns empty. A query that groups on `agent_id` will not see them. `ImportedChatRead` and `ImportedChatSearched` are agent turns and attribute normally.
+
+`ImportedChatSearched` is emitted for every search attempt, including ones that returned nothing and ones that never ran. `outcome` is what separates them, and the separation is load-bearing: `empty` means the term was not found in what was searched, while `refused` means the search did not happen and says nothing about the corpus. Counting rows without reading `outcome` will treat a refusal as evidence of absence.
+
+`query_digest` is a keyed HMAC of the query, not the query. Equal digests mean equal queries, which is enough to correlate repetition, and the query text is not recoverable from a row. The field is absent when the key was unavailable at gateway start, which the gateway records separately as an `imported-search.digest-unavailable` legacy audit action.
+
+The `Action` label vocabulary gains `imported_chat_read` and `imported_chat_search`, which ride the existing `PermissionDenied` and `PermissionApproved` events. Their `action_key` values are `imported_chat:<source>`, `imported_search:<source>`, and `imported_search_corpus` for a search not scoped to one source.
 
 Row metadata on every typed event: `session_id`, `seq`, `ts`,
 `trust`, `kind`. The forwarder wraps each row in a per-target
