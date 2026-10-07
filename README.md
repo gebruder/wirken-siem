@@ -11,13 +11,13 @@ binary.
 | wirken-siem | Wirken audit schema |
 |-------------|---------------------|
 | 0.1         | 1.3.x – 1.8.x       |
-| 0.2         | 1.3.x – 1.19.x      |
+| 0.2         | 1.3.x – 1.28.x      |
 
 wirken-siem 0.1 shipped detections 1-8 against audit schema 1.3.x
 through 1.8.x. 0.2 adds detections 9 (per-agent cost anomaly) and 10
-(per-agent budget exceeded) and extends support through 1.19.x.
+(per-agent budget exceeded) and extends support through 1.28.x.
 
-Every audit-schema change from 1.4.0 through 1.19.0 has been
+Every audit-schema change from 1.4.0 through 1.28.0 has been
 forward-compatible (`#[serde(default)]` on new fields, new variants
 sitting alongside existing ones): 1.8.0 added a `wasm_skill_call`
 value to the `Action` label vocabulary (it rides the existing
@@ -31,8 +31,21 @@ vocabulary, and 1.16.0 added the `sandbox_egress_verdict` and
 the audit schema not at all. 1.19.0 added the `import_started`,
 `import_completed`, `imported_chat_read` and `imported_chat_searched`
 typed variants, plus `imported_chat_read` and `imported_chat_search`
-values in the `Action` label vocabulary. Existing detection content
-fires unmodified across the range.
+values in the `Action` label vocabulary. 1.20.0 added the
+`permission_renewed`, `permission_grant_expired`,
+`permission_grant_pruned` and `subagent_session_bound` typed variants,
+plus `tool` on `BudgetExceeded`, `tools_hash_version` on `LlmRequest`
+and `max_permission_tier` on `SubagentSpawned`. 1.21.0 changed the
+audit schema not at all. 1.22.0 added the `delivery_confirmed` and
+`delivery_failed` typed variants. 1.23.0 changed nothing. 1.24.0 added
+the `permission_approval_refused` and `permission_revoked` typed
+variants, plus `text` on `AssistantToolCalls`, `redaction`,
+`superseded_chain_hash` and `superseded_signature` on `ChainHead`,
+`tier` and `expires_at` on `PermissionApproved`, and `sandbox` on
+`ToolResult`. 1.24.1 through 1.27.0 changed the audit schema not at
+all. 1.28.0 added `exec_location` on `PermissionApproved` and
+`PermissionDenied`. The `Action` label vocabulary is unchanged since
+1.19.0. Existing detection content fires unmodified across the range.
 
 `SessionEvent` variants added since 1.4.x. Detections 6, 7, and 8
 consume `McpEntryRefused`, `HookDispatched`, and
@@ -53,6 +66,16 @@ consume `McpEntryRefused`, `HookDispatched`, and
   with no decision-broker transport, so the exec was refused)
 - `MemoryEntryWritten`, `CrossChannelMemoryRead` (1.15.0,
   cross-channel memory provenance and trust-zone crossings)
+- `PermissionRenewed`, `PermissionGrantExpired`, `PermissionGrantPruned`
+  (1.20.0, grant lifecycle: a grant extended, lapsed, or removed as
+  unreadable)
+- `SubagentSessionBound` (1.20.0, a child session's own record of what
+  it was granted)
+- `DeliveryConfirmed`, `DeliveryFailed` (1.22.0, the adapter's report of
+  what the platform did with an outbound message)
+- `PermissionApprovalRefused` (1.24.0, an approval attempt by a caller
+  with no authority to make it)
+- `PermissionRevoked` (1.24.0, an operator removing a stored grant)
 
 Fields added to existing variants since 1.4.x:
 
@@ -68,6 +91,19 @@ Fields added to existing variants since 1.4.x:
   sessions. Carries the originating principal across the LLM call
   boundary for correlation with the sibling `UserMessage` / `ToolResult`
   rows.
+- `BudgetExceeded`: `tool` (1.20.0).
+- `LlmRequest`: `tools_hash_version` (1.20.0).
+- `SubagentSpawned`: `max_permission_tier` (1.20.0).
+- `AssistantToolCalls`: `text` (1.24.0), what the model said in the
+  same message as the calls.
+- `ChainHead`: `redaction`, `superseded_chain_hash`,
+  `superseded_signature` (1.24.0).
+- `PermissionApproved`: `tier`, `expires_at` (1.24.0).
+- `ToolResult`: `sandbox` (1.24.0), `{mode, runtime, container_id?}`
+  for an `exec`: where the command ran.
+- `PermissionApproved` / `PermissionDenied`: `exec_location` (1.28.0),
+  `{mode, text}` for an `exec` an operator was asked about: the line
+  the approval prompt showed.
 
 ### Detection 9 minimum
 
@@ -120,6 +156,14 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `ImportCompleted`      | `actor`, `source_id`, `provider`, `source_account`, `archive_sha256`, `added`, `updated`, `unchanged`, `unorderable`, `skipped` | (none here; reserved) |
 | `ImportedChatRead`     | `agent_id`, `adapter_id?`, `sender_id?`, `source_id`, `source_account?`, `conversation_uuid`, `message_count` | (none here; reserved) |
 | `ImportedChatSearched` | `agent_id`, `adapter_id?`, `sender_id?`, `source_id?`, `outcome` (`hits` / `empty` / `refused`), `match_count`, `query_digest?` | (none here; reserved) |
+| `PermissionGrantExpired` | `agent_id`, `adapter_id?`, `sender_id?`, `action_key`, `tool?`, `tier?`, `expired_at`, `detected_by?` (`tool_call` / `store_open`) | (none here; reserved) |
+| `PermissionGrantPruned` | `agent_id`, `action_key`, `expires_at` | (none here; reserved) |
+| `PermissionRenewed`    | `agent_id`, `adapter_id?`, `sender_id?`, `action_key`, `approved_by`, `approved_via?`, `previous_expires_at`, `expires_at` | (none here; reserved) |
+| `PermissionRevoked`    | `agent_id`, `action_key`, `revoked_by`, `tier?`, `expires_at?` | (none here; reserved) |
+| `PermissionApprovalRefused` | `request_id`, `action_key?`, `caller`, `reason` (`unauthorized_actor` / `wrong_channel` / `wrong_conversation`), `adapter_id?` | (none here; reserved) |
+| `SubagentSessionBound` | `agent_id`, `parent_session_id`, `depth`, `max_permission_tier`, `tools_granted[]`, `offered_tools[]` | (none here; reserved) |
+| `DeliveryConfirmed`    | `target`, `message_id`, `adapter_id?` | (none here; reserved) |
+| `DeliveryFailed`       | `target`, `error`, `adapter_id?` | (none here; reserved) |
 
 `SandboxEgressVerdict` is emitted for every request the proxy decides, allow included, not only refusals. An allow row carries the same `sensitivity_basis`, which is what lets a detection assert that a connection was permitted after a given set of reads rather than seeing only what was turned away. Expect one row per proxied CONNECT.
 
@@ -132,6 +176,21 @@ An import is an operator action, not an agent turn, so `ImportStarted` and `Impo
 `query_digest` is a keyed HMAC of the query, not the query. Equal digests mean equal queries, which is enough to correlate repetition, and the query text is not recoverable from a row. The field is absent when the key was unavailable at gateway start, which the gateway records separately as an `imported-search.digest-unavailable` legacy audit action.
 
 The `Action` label vocabulary gains `imported_chat_read` and `imported_chat_search`, which ride the existing `PermissionDenied` and `PermissionApproved` events. Their `action_key` values are `imported_chat:<source>`, `imported_search:<source>`, and `imported_search_corpus` for a search not scoped to one source.
+
+Of the variants added since 1.20.0, the typed forwarder sends
+`PermissionGrantExpired`, `PermissionGrantPruned` and
+`SubagentSessionBound` by default. `PermissionRenewed`,
+`PermissionRevoked`, `PermissionApprovalRefused`, `DeliveryConfirmed`
+and `DeliveryFailed` are outside the default set and reach a SIEM only
+when listed in `typed_include_variants`.
+
+`exec_location` rides `PermissionDenied`, which is forwarded by default,
+and `PermissionApproved`, which is not. Its `mode` is the sandbox mode
+the prompt described; the `mode` and `runtime` on the paired
+`ToolResult.sandbox` are where the command ran. A row pair where the
+prompt said a container and the result says `runtime: host` is the
+mismatch `wirken sessions verify` reports as an `exec_location`
+divergence.
 
 Row metadata on every typed event: `session_id`, `seq`, `ts`,
 `trust`, `kind`. The forwarder wraps each row in a per-target
