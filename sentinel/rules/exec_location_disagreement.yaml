@@ -1,0 +1,46 @@
+id: 7c4f9c41-2a5e-4b8e-a3e0-d1c0a01a0011
+name: Wirken - exec approval prompt disagreed with where it ran
+description: |
+  Detection 11. Fires on any ExecLocationDisagreement row, which
+  `wirken sessions verify` records on the gateway-verify lane when an
+  exec approval's stated location (`told`) and the exec result's
+  sandbox record (`ran`) differ in mode, or one says the host and the
+  other a container. `told.mode` exec_only or gvisor with
+  `ran.runtime` host is a sandbox that failed open. Requires audit
+  schema 1.28.0 and the default exec_location_disagreement forwarding;
+  a row appears only after verify has been run over the session.
+severity: High
+status: Available
+requiredDataConnectors: []
+queryFrequency: PT15M
+queryPeriod: PT15M
+triggerOperator: GreaterThan
+triggerThreshold: 0
+suppressionDuration: PT0M
+suppressionEnabled: false
+tactics:
+  - DefenseEvasion
+  - Execution
+relevantTechniques:
+  - T1562
+query: |
+  Custom_WirkenSession_CL
+  | where Kind == "exec_location_disagreement"
+  | extend body = parse_json(Event)
+  | project
+      TimeGenerated,
+      SessionId,
+      Seq,
+      AgentId,
+      VerifiedSessionId = tostring(body.verified_session_id),
+      ApprovalSeq = tolong(body.approval_seq),
+      ResultSeq = tolong(body.result_seq),
+      ToldMode = tostring(body.told.mode),
+      ToldText = tostring(body.told.text),
+      RanMode = tostring(body.ran.mode),
+      RanRuntime = tostring(body.ran.runtime)
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AgentId

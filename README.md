@@ -12,10 +12,14 @@ binary.
 |-------------|---------------------|
 | 0.1         | 1.3.x – 1.8.x       |
 | 0.2         | 1.3.x – 1.28.x      |
+| 0.3         | 1.3.x – 1.28.x      |
 
 wirken-siem 0.1 shipped detections 1-8 against audit schema 1.3.x
 through 1.8.x. 0.2 adds detections 9 (per-agent cost anomaly) and 10
-(per-agent budget exceeded) and extends support through 1.28.x.
+(per-agent budget exceeded) and extends support through 1.28.x. 0.3
+adds detection 11 (exec approval prompt disagreed with where it ran),
+which needs audit schema 1.28.0; detections 1-10 fire unmodified across
+the range.
 
 Every audit-schema change from 1.4.0 through 1.28.0 has been
 forward-compatible (`#[serde(default)]` on new fields, new variants
@@ -43,8 +47,8 @@ variants, plus `text` on `AssistantToolCalls`, `redaction`,
 `superseded_chain_hash` and `superseded_signature` on `ChainHead`,
 `tier` and `expires_at` on `PermissionApproved`, and `sandbox` on
 `ToolResult`. 1.24.1 through 1.27.0 changed the audit schema not at
-all. 1.28.0 added `exec_location` on `PermissionApproved` and
-`PermissionDenied`. The `Action` label vocabulary is unchanged since
+all. 1.28.0 added the `exec_location_disagreement` typed variant, plus
+`exec_location` on `PermissionApproved` and `PermissionDenied`. The `Action` label vocabulary is unchanged since
 1.19.0. Existing detection content fires unmodified across the range.
 
 `SessionEvent` variants added since 1.4.x. Detections 6, 7, and 8
@@ -76,6 +80,8 @@ consume `McpEntryRefused`, `HookDispatched`, and
 - `PermissionApprovalRefused` (1.24.0, an approval attempt by a caller
   with no authority to make it)
 - `PermissionRevoked` (1.24.0, an operator removing a stored grant)
+- `ExecLocationDisagreement` (1.28.0, `wirken sessions verify` finding
+  an exec that ran somewhere other than its approval prompt said)
 
 Fields added to existing variants since 1.4.x:
 
@@ -164,6 +170,7 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `SubagentSessionBound` | `agent_id`, `parent_session_id`, `depth`, `max_permission_tier`, `tools_granted[]`, `offered_tools[]` | (none here; reserved) |
 | `DeliveryConfirmed`    | `target`, `message_id`, `adapter_id?` | (none here; reserved) |
 | `DeliveryFailed`       | `target`, `error`, `adapter_id?` | (none here; reserved) |
+| `ExecLocationDisagreement` | `agent_id`, `adapter_id?`, `sender_id?`, `verified_session_id`, `approval_seq`, `result_seq`, `told.{mode,text}`, `ran.{mode,runtime,container_id?}` | 11 |
 
 `SandboxEgressVerdict` is emitted for every request the proxy decides, allow included, not only refusals. An allow row carries the same `sensitivity_basis`, which is what lets a detection assert that a connection was permitted after a given set of reads rather than seeing only what was turned away. Expect one row per proxied CONNECT.
 
@@ -185,7 +192,12 @@ and `DeliveryFailed` are outside the default set and reach a SIEM only
 when listed in `typed_include_variants`.
 
 `exec_location` rides `PermissionDenied`, which is forwarded by default,
-and `PermissionApproved`, which is not. Its `mode` is the sandbox mode
+and `PermissionApproved`, which is not. `ExecLocationDisagreement` is
+forwarded by default for that reason: it carries the approval's `told`
+and the result's `ran` on one row, so detection 11 needs no approval
+rows. It is written by `wirken sessions verify` to the `gateway-verify`
+lane, so its `session_id` is that lane and `verified_session_id` is
+the session the pair is on; it appears only once verify has been run. Its `mode` is the sandbox mode
 the prompt described; the `mode` and `runtime` on the paired
 `ToolResult.sandbox` are where the command ran. A row pair where the
 prompt said a container and the result says `runtime: host` is the
@@ -211,6 +223,7 @@ target.
 | 8  | Tool output redacted by egress hook | `ToolOutputRedacted`          | medium            |
 | 9  | Per-agent LLM cost anomaly         | `LlmResponse`                  | medium            |
 | 10 | Per-agent budget exceeded          | `BudgetExceeded`               | medium            |
+| 11 | Exec prompt disagreed with the run | `ExecLocationDisagreement`     | high              |
 
 ## Layout
 

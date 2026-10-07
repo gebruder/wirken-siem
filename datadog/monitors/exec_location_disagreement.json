@@ -1,0 +1,22 @@
+{
+  "name": "Wirken: exec approval prompt disagreed with where it ran",
+  "type": "log alert",
+  "query": "logs(\"@ddsource:wirken @wirken.kind:exec_location_disagreement\").index(\"main\").rollup(\"count\").last(\"15m\") > 0",
+  "message": "A Wirken exec ran somewhere other than its approval prompt told the operator.\n\nDetection: exec_location_disagreement (11)\nSeverity baseline: high\n\n`@wirken.event.told` is what the prompt said (`mode`, `text`); `@wirken.event.ran` is where the command ran (`mode`, `runtime`). `told.mode` exec_only or gvisor with `ran.runtime` host is a sandbox that failed open. Pivot on @wirken.event.verified_session_id, @wirken.event.approval_seq, @wirken.event.result_seq, @wirken.event.agent_id.\n\nRecorded by `wirken sessions verify` on the gateway-verify lane. Requires audit schema 1.28.0 and the default exec_location_disagreement forwarding.\n\n@security-team",
+  "tags": [
+    "service:wirken",
+    "detection:exec_location_disagreement",
+    "source:wirken-siem"
+  ],
+  "options": {
+    "thresholds": {
+      "critical": 0
+    },
+    "notify_audit": true,
+    "include_tags": true,
+    "evaluation_delay": 60,
+    "new_group_delay": 60,
+    "renotify_interval": 30
+  },
+  "priority": 2
+}

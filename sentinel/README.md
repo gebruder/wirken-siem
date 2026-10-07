@@ -68,3 +68,4 @@ Critical when no matching alarm row is found.
 | `tool_output_redacted.yaml`     | Medium            | Custom_WirkenSession_CL     |
 | `agent_cost_anomaly.yaml`       | Medium            | Custom_WirkenSession_CL     |
 | `budget_exceeded.yaml`          | Medium            | Custom_WirkenSession_CL     |
+| `exec_location_disagreement.yaml` | High            | Custom_WirkenSession_CL     |

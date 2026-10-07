@@ -82,3 +82,4 @@ its detail JSON.
 | `wirken_d8_tool_output_redacted`              | `wirken:session` | Detection 8 |
 | `wirken_d9_agent_cost_anomaly`                | `wirken:session` | Detection 9, needs `llm_response` opt-in |
 | `wirken_d10_budget_exceeded`                  | `wirken:session` | Detection 10, forwarded by default |
+| `wirken_d11_exec_location_disagreement`       | `wirken:session` | Detection 11, forwarded by default, recorded by `sessions verify` |
