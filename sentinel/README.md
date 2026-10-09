@@ -12,8 +12,10 @@ The detections read from two Data Collection Rules (DCRs):
   legacy shape.
 - `Custom-WirkenSession_CL`: typed SessionEvent rows from the
   wirken `sentinel_typed.endpoint`. Column-pinned to the typed
-  shape: `TimeGenerated`, `SessionId`, `Seq`, `Kind`, `Trust`,
-  `AgentId`, `AdapterId`, `SenderId`, `Event`, `Hostname`.
+  shape: `TimeGenerated`, `SessionId`, `Seq`, `Kind`, `Level`,
+  `Trust`, `AgentId`, `AdapterId`, `SenderId`, `Event`, `Hostname`.
+  `Level` (string) has to be declared in the DCR stream
+  declaration and the table for Sentinel to store it.
 
 Configure both DCRs in your Sentinel workspace before deploying
 the rules. The wirken side ships the row shapes; the DCR

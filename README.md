@@ -171,6 +171,10 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `DeliveryConfirmed`    | `target`, `message_id`, `adapter_id?` | (none here; reserved) |
 | `DeliveryFailed`       | `target`, `error`, `adapter_id?` | (none here; reserved) |
 | `ExecLocationDisagreement` | `agent_id`, `adapter_id?`, `sender_id?`, `verified_session_id`, `approval_seq`, `result_seq`, `told.{mode,text}`, `ran.{mode,runtime,container_id?}` | 11 |
+| `AdapterConnect`       | `adapter_id`, `channel`, `pubkey_fingerprint` | (none here; reserved) |
+| `AdapterDisconnect`    | `adapter_id`, `channel`, `pubkey_fingerprint`, `reason` (`ended` / `panic`) | (none here; reserved) |
+| `AdapterRestart`       | `adapter_id`, `channel`, `attempt`, `cause` (`process_exited` / `connection_ended` / `connection_panicked` / `spawn_failed`), `exit`, `delay_ms`, `connected_for_ms?` | (none here; reserved) |
+| `AdapterRestartAbandoned` | `adapter_id`, `channel`, `attempts`, `last_cause`, `last_exit` | (none here; reserved) |
 
 `SandboxEgressVerdict` is emitted for every request the proxy decides, allow included, not only refusals. An allow row carries the same `sensitivity_basis`, which is what lets a detection assert that a connection was permitted after a given set of reads rather than seeing only what was turned away. Expect one row per proxied CONNECT.
 
