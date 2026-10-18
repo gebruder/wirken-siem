@@ -43,6 +43,7 @@ import json
 import os
 import re
 from collections.abc import Iterable
+from datetime import datetime, timedelta
 from typing import Any
 
 Event = dict[str, Any]
@@ -337,7 +338,9 @@ def detect_chain_tamper(event: Event) -> Match | None:
     return {
         "detection": "chain_tamper",
         "severity": "high",
-        "session_id": event.get("session") or detail.get("session_id"),
+        # The row names the session in its detail as `session`; the
+        # envelope's own `session` is null on this row.
+        "session_id": detail.get("session"),
         "seq": detail.get("seq"),
         "expected_hash": detail.get("expected_hash"),
         "actual_hash": detail.get("actual_hash"),
@@ -438,9 +441,171 @@ def detect_tool_output_redacted(event: Event) -> Match | None:
 # ---------------------------------------------------------------
 
 
-def evaluate(event: Event, skill_dirs: Iterable[str]) -> list[Match]:
+def _parse_ts(value: str | None) -> datetime | None:
+    """Parse an RFC 3339 timestamp as Wirken writes it, which can carry
+    nanoseconds; ``datetime`` keeps microseconds."""
+    if not isinstance(value, str):
+        return None
+    m = re.match(r"^(.*T\d{2}:\d{2}:\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})$", value)
+    if m is None:
+        return None
+    base, frac, tz = m.groups()
+    text = base + ("." + (frac + "000000")[:6] if frac else "") + ("+00:00" if tz == "Z" else tz)
+    try:
+        return datetime.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+# Detection 5 escalation: the alarm-log join.
+
+ALARM_WINDOW = timedelta(seconds=60)
+
+
+def chain_tamper_severity(
+    chain_broken: Event, alarm_records: Iterable[dict[str, Any]]
+) -> str:
+    """``high`` when the alarm log holds a ``chain_broken`` record for
+    the same ``(session_id, seq)`` within 60 seconds of the
+    ``audit.chain_broken`` row, otherwise ``critical``: an integrity
+    break the out-of-chain alarm log does not document.
+
+    ``alarm_records`` are lines of ``audit-alarms.log``, each a flat
+    JSON object with ``session_id`` and ``seq``. The chain-broken row
+    names its session as ``detail.session``."""
+    match = detect_chain_tamper(chain_broken)
+    if match is None:
+        raise ValueError("not an audit.chain_broken row")
+    at = _parse_ts(chain_broken.get("timestamp"))
+    for rec in alarm_records:
+        if rec.get("session_id") != match["session_id"] or rec.get("seq") != match["seq"]:
+            continue
+        when = _parse_ts(rec.get("timestamp"))
+        if at is not None and when is not None and abs(when - at) <= ALARM_WINDOW:
+            return "high"
+    return "critical"
+
+
+# ---------------------------------------------------------------
+# Detection 12: binary changed outside `wirken update`
+# ---------------------------------------------------------------
+
+
+def _version_tuple(v: Any) -> tuple[int, ...] | None:
+    if not isinstance(v, str):
+        return None
+    parts = v.split(".")
+    if len(parts) != 3 or not all(p.isdigit() for p in parts):
+        return None
+    return tuple(int(p) for p in parts)
+
+
+class InstallTracker:
+    """Correlates ``gateway.start`` legacy rows with the most recent
+    ``binary_installed`` typed row from the same host.
+
+    ``binary_installed`` is written while the gateway is stopped and
+    reaches the typed pipe only after the next start, so a
+    ``gateway.start`` can arrive before the install row it should be
+    judged against. A start is held until a typed row from the same
+    host, timestamped at or after the start, shows the typed pipe has
+    caught up, or until :meth:`flush`."""
+
+    def __init__(self) -> None:
+        self._installs: dict[str, list[tuple[datetime, Event]]] = {}
+        self._pending: dict[str, list[Event]] = {}
+
+    def observe(self, event: Event) -> list[Match]:
+        host = event.get("hostname")
+        at = _parse_ts(event.get("timestamp"))
+        if host is None or at is None:
+            return []
+        if event.get("kind") is None:
+            detail = event.get("detail") or {}
+            if event.get("action") == "gateway.start" and detail.get("version"):
+                self._pending.setdefault(host, []).append(event)
+            return []
+        if _is_typed_kind(event, "binary_installed"):
+            self._installs.setdefault(host, []).append((at, event))
+        ready = [s for s in self._pending.get(host, []) if _parse_ts(s["timestamp"]) <= at]
+        if not ready:
+            return []
+        self._pending[host] = [s for s in self._pending[host] if s not in ready]
+        return [m for s in ready if (m := self._judge(host, s)) is not None]
+
+    def flush(self) -> list[Match]:
+        """Judge every held start against what has been seen."""
+        out: list[Match] = []
+        for host, starts in self._pending.items():
+            out.extend(m for s in starts if (m := self._judge(host, s)) is not None)
+        self._pending = {}
+        return out
+
+    def _judge(self, host: str, start: Event) -> Match | None:
+        at = _parse_ts(start["timestamp"])
+        detail = start.get("detail") or {}
+        before = [(t, e) for t, e in self._installs.get(host, []) if at is not None and t <= at]
+        base = {
+            "detection": "binary_changed_outside_update",
+            "hostname": host,
+            "started_at": start.get("timestamp"),
+            "started_version": detail.get("version"),
+            "started_commit": detail.get("commit"),
+            "started_dirty": detail.get("dirty"),
+        }
+        if not before:
+            # install.sh and source builds leave no install row.
+            return {**base, "severity": "informational", "finding": "no_install_record"}
+        _, last = max(before, key=lambda te: te[0])
+        installed = last["event"].get("to_version")
+        base["installed_version"] = installed
+        base["installed_at"] = last.get("timestamp")
+        if detail.get("version") != installed:
+            return {**base, "severity": "high", "finding": "version_differs"}
+        if detail.get("commit") == "unknown" or detail.get("dirty") != "clean":
+            # A release binary is built from a clean tree at a known
+            # commit; this one was not.
+            return {**base, "severity": "high", "finding": "not_a_release_build"}
+        return None
+
+
+# ---------------------------------------------------------------
+# Detection 13: downgrade or rollback
+# ---------------------------------------------------------------
+
+
+def detect_downgrade_or_rollback(event: Event) -> Match | None:
+    if not _is_typed_kind(event, "binary_installed"):
+        return None
+    payload = event["event"]
+    rollback = payload.get("rollback") is True
+    from_v = _version_tuple(payload.get("from_version"))
+    to_v = _version_tuple(payload.get("to_version"))
+    downgrade = from_v is not None and to_v is not None and to_v < from_v
+    if not (rollback or downgrade):
+        return None
+    return {
+        "detection": "downgrade_or_rollback",
+        "severity": "medium",
+        "finding": "rollback" if rollback else "downgrade",
+        "hostname": event.get("hostname"),
+        "session_id": event.get("session_id"),
+        "seq": event.get("seq"),
+        "from_version": payload.get("from_version"),
+        "to_version": payload.get("to_version"),
+        "rollback": rollback,
+        "binary_sha256": payload.get("binary_sha256"),
+        "target": payload.get("target"),
+        "verifying_key": payload.get("verifying_key"),
+    }
+
+
+def evaluate(
+    event: Event, skill_dirs: Iterable[str], installs: InstallTracker | None = None
+) -> list[Match]:
     """Run every detection against a single event. Returns the
-    list of matches (zero, one, or more)."""
+    list of matches (zero, one, or more). Detection 12 runs only with
+    an ``installs`` tracker, which carries state across events."""
     matches: list[Match] = []
     for fn in (
         detect_shell_outbound_fetch,
@@ -450,6 +615,7 @@ def evaluate(event: Event, skill_dirs: Iterable[str]) -> list[Match]:
         detect_mcp_entry_refused,
         detect_hook_refused,
         detect_tool_output_redacted,
+        detect_downgrade_or_rollback,
     ):
         result = fn(event)
         if result is not None:
@@ -457,4 +623,6 @@ def evaluate(event: Event, skill_dirs: Iterable[str]) -> list[Match]:
     sd = detect_skill_dir_exec(event, skill_dirs)
     if sd is not None:
         matches.append(sd)
+    if installs is not None:
+        matches.extend(installs.observe(event))
     return matches

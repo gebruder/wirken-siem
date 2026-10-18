@@ -53,6 +53,18 @@ The monitor queries reference these `@`-prefixed attributes:
   row's timestamp (join by `session_id`+`call_id`). Used by
   Detection 2 long-running subset.
 
+- `@install.recorded` (boolean) and `@install.version_matches`
+  (boolean) - on `gateway.start` rows: whether the host has a
+  `binary_installed` row, and whether the most recent one's
+  `to_version` equals `@wirken.detail.version`. `@install.to_version`
+  - that `to_version`. Used by Detection 12; see the reference tables
+  below.
+- `@install.version_delta` (number) - on `binary_installed` rows:
+  `@wirken.event.to_version` minus `@wirken.event.from_version`, as
+  `major * 1000000 + minor * 1000 + patch` of each. Build it with a
+  grok parser splitting both versions into numeric attributes and an
+  arithmetic processor. Used by Detection 13.
+
 Build this with a Datadog log parsing pipeline (Logs >
 Configuration > Pipelines). The detection content here does not
 ship the pipeline JSON because it depends on per-org parsing
@@ -95,10 +107,37 @@ prefix
 Empty table makes the monitor never fire; document this as a
 known gap on first deploy.
 
+## Reference tables: `wirken_install_hosts` and `wirken_installs` (Detection 12)
+
+A log monitor cannot compare two attributes or join two log streams,
+so Detection 12 reads its comparison from the pipeline. Keep two
+reference tables current from `@wirken.kind:binary_installed` logs,
+for example with a scheduled export:
+
+- `wirken_install_hosts`: primary key `host`, column `to_version`:
+  the `to_version` of each host's most recent `binary_installed` row.
+- `wirken_installs`: primary key `host_version`, the string
+  `<host>|<to_version>` for the same row.
+
+On `@wirken.action:gateway.start` rows, a lookup processor maps
+`host` against `wirken_install_hosts` to `@install.to_version`, and a
+category processor sets `@install.recorded:true` when it is present.
+A string builder processor sets `@install.key` to
+`%{host}|%{wirken.detail.version}`, and a lookup against
+`wirken_installs` sets `@install.version_matches:true` on a hit.
+
+Detection 12 is only as current as the tables. A host the tables do
+not list reads as having no install record, which the informational
+monitor reports; installs through install.sh and source builds leave
+no `binary_installed` row in the first place.
+
 ## Alarm log for Detection 5
 
 Wire the wirken alarm log (default `~/.wirken/audit-alarms.log`)
 as a separate Datadog log source with `@ddsource:wirken-alarm-log`.
+Each alarm record carries `@session_id` and `@seq`; the
+`audit.chain_broken` row carries them as `@wirken.detail.session`
+and `@wirken.detail.seq`.
 Then convert the chain-tamper monitor into a composite that
 escalates from high (chain-broken seen) to critical (chain-broken
 seen AND no matching alarm-log row within 60s).
@@ -118,3 +157,6 @@ seen AND no matching alarm-log row within 60s).
 | Per-agent LLM cost anomaly    | `monitors/agent_cost_anomaly.json` |
 | Per-agent budget exceeded     | `monitors/budget_exceeded.json`   |
 | Exec prompt and run disagree  | `monitors/exec_location_disagreement.json` |
+| Binary changed outside update | `monitors/binary_changed_outside_update.json` |
+| No install record (informational) | `monitors/binary_changed_outside_update_unrecorded.json` |
+| Downgrade or rollback         | `monitors/downgrade_or_rollback.json` |

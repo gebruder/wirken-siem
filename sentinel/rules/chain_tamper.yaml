@@ -5,7 +5,9 @@ description: |
   legacy Wirken audit feed. Baseline severity is High; the rule
   promotes to Critical when the alarm-log feed
   (Custom_WirkenAlarms_CL) does not show a matching row by
-  (SessionId, Seq) within 60 seconds.
+  (SessionId, Seq) within 60 seconds. The chain-broken row names
+  its session in Detail as `session`; the alarm record as
+  `session_id`.
 severity: High
 status: Available
 requiredDataConnectors: []
@@ -26,7 +28,7 @@ query: |
     | extend detail = parse_json(Detail)
     | project
         TimeGenerated,
-        SessionId = tostring(detail.session_id),
+        SessionId = tostring(detail.session),
         Seq = tolong(detail.seq),
         ExpectedHash = tostring(detail.expected_hash),
         ActualHash = tostring(detail.actual_hash),

@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-10-18T12:30:01Z",
+  "alarm_type": "chain_broken",
+  "session_id": "sess-1",
+  "seq": 42,
+  "expected_hash": "aabb",
+  "actual_hash": "ccdd",
+  "hostname": "h1",
+  "gateway_pid": 4242
+}

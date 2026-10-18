@@ -196,6 +196,32 @@ def test_chain_tamper_fires_on_legacy_chain_broken_event():
     assert m["severity"] == "high"
 
 
+def test_chain_tamper_reads_the_session_from_detail_session():
+    # The row Wirken writes: the envelope's `session` is null and the
+    # detail names the session as `session`, not `session_id`.
+    ev = load_fixture("audit_legacy_chain_broken.json")
+    assert ev["session"] is None
+    assert "session_id" not in ev["detail"]
+    assert rules.detect_chain_tamper(ev)["session_id"] == ev["detail"]["session"]
+
+
+def test_chain_tamper_joins_the_alarm_log_and_stays_high():
+    ev = load_fixture("audit_legacy_chain_broken.json")
+    alarm = load_fixture("alarm_log_chain_broken.json")
+    assert rules.chain_tamper_severity(ev, [alarm]) == "high"
+
+
+def test_chain_tamper_is_critical_without_a_matching_alarm():
+    ev = load_fixture("audit_legacy_chain_broken.json")
+    alarm = load_fixture("alarm_log_chain_broken.json")
+    other_seq = dict(alarm, seq=43)
+    other_session = dict(alarm, session_id="sess-2")
+    too_late = dict(alarm, timestamp="2026-10-18T12:31:30Z")
+    assert rules.chain_tamper_severity(ev, []) == "critical"
+    for rec in (other_seq, other_session, too_late):
+        assert rules.chain_tamper_severity(ev, [rec]) == "critical"
+
+
 def test_chain_tamper_ignores_typed_envelope():
     ev = load_fixture("tool_result.json")
     assert rules.detect_chain_tamper(ev) is None
@@ -423,6 +449,157 @@ def test_http_path_accepts_without_signature_when_secret_unset(tmp_path, capsys)
     raw = json.dumps(body_obj).encode("utf-8")
     resp = client.post("/", data=raw)
     assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------
+# Detection 12
+# ---------------------------------------------------------------
+
+
+def _typed_after(ts: str, host: str = "h1") -> dict:
+    """A typed row from `host` at `ts`: the typed pipe caught up."""
+    ev = load_fixture("mcp_entry_refused.json")
+    ev["timestamp"] = ts
+    ev["hostname"] = host
+    return ev
+
+
+CAUGHT_UP = "2026-10-18T22:40:02.000000001+00:00"
+
+
+def test_binary_changed_is_silent_when_the_start_matches_the_install():
+    t = rules.InstallTracker()
+    assert t.observe(load_fixture("binary_installed.json")) == []
+    assert t.observe(load_fixture("audit_legacy_gateway_start.json")) == []
+    assert t.observe(_typed_after(CAUGHT_UP)) == []
+    assert t.flush() == []
+
+
+def test_binary_changed_waits_for_an_install_row_that_arrives_after_the_start():
+    # The install row is written while the gateway is stopped and
+    # reaches the typed pipe after the start's legacy row.
+    t = rules.InstallTracker()
+    assert t.observe(load_fixture("audit_legacy_gateway_start.json")) == []
+    assert t.observe(load_fixture("binary_installed.json")) == []
+    assert t.observe(_typed_after(CAUGHT_UP)) == []
+    assert t.flush() == []
+
+
+def test_binary_changed_fires_high_when_the_version_differs():
+    t = rules.InstallTracker()
+    t.observe(load_fixture("binary_installed.json"))
+    start = load_fixture("audit_legacy_gateway_start.json")
+    start["detail"]["version"] = "2.3.1"
+    t.observe(start)
+    (m,) = t.observe(_typed_after(CAUGHT_UP))
+    assert m["detection"] == "binary_changed_outside_update"
+    assert m["severity"] == "high"
+    assert m["finding"] == "version_differs"
+    assert (m["started_version"], m["installed_version"]) == ("2.3.1", "2.3.0")
+
+
+def test_binary_changed_fires_high_on_a_build_that_is_not_a_release():
+    for detail in ({"dirty": "dirty"}, {"commit": "unknown", "dirty": "unknown"}):
+        t = rules.InstallTracker()
+        t.observe(load_fixture("binary_installed.json"))
+        start = load_fixture("audit_legacy_gateway_start.json")
+        start["detail"].update(detail)
+        t.observe(start)
+        (m,) = t.observe(_typed_after(CAUGHT_UP))
+        assert (m["severity"], m["finding"]) == ("high", "not_a_release_build"), detail
+
+
+def test_binary_changed_is_informational_with_no_install_row():
+    t = rules.InstallTracker()
+    t.observe(load_fixture("audit_legacy_gateway_start.json"))
+    (m,) = t.observe(_typed_after(CAUGHT_UP))
+    assert (m["severity"], m["finding"]) == ("informational", "no_install_record")
+
+
+def test_binary_changed_compares_against_the_most_recent_install_on_the_same_host():
+    t = rules.InstallTracker()
+    older = load_fixture("binary_installed.json")
+    older["timestamp"] = "2026-10-01T09:00:00.000000000+00:00"
+    older["event"]["to_version"] = "2.2.0"
+    t.observe(older)
+    t.observe(load_fixture("binary_installed.json"))
+    elsewhere = load_fixture("binary_installed.json")
+    elsewhere["hostname"] = "h2"
+    elsewhere["event"]["to_version"] = "2.3.1"
+    t.observe(elsewhere)
+    t.observe(load_fixture("audit_legacy_gateway_start.json"))
+    assert t.observe(_typed_after(CAUGHT_UP)) == []
+    # A typed row from another host does not release h1's start.
+    t2 = rules.InstallTracker()
+    t2.observe(load_fixture("audit_legacy_gateway_start.json"))
+    assert t2.observe(_typed_after(CAUGHT_UP, host="h2")) == []
+    assert len(t2.flush()) == 1
+
+
+def test_binary_changed_ignores_a_start_that_names_no_build():
+    # Binaries before 2.3.0 write gateway.start with a null detail.
+    t = rules.InstallTracker()
+    start = load_fixture("audit_legacy_gateway_start.json")
+    start["detail"] = None
+    t.observe(start)
+    assert t.observe(_typed_after(CAUGHT_UP)) == []
+    assert t.flush() == []
+
+
+def test_evaluate_runs_detection_12_with_a_tracker():
+    t = rules.InstallTracker()
+    start = load_fixture("audit_legacy_gateway_start.json")
+    assert rules.evaluate(start, [], t) == []
+    out = rules.evaluate(_typed_after(CAUGHT_UP), [], t)
+    assert [m["detection"] for m in out] == ["mcp_entry_refused", "binary_changed_outside_update"]
+    assert rules.evaluate(start, []) == []
+
+
+# ---------------------------------------------------------------
+# Detection 13
+# ---------------------------------------------------------------
+
+
+def test_downgrade_or_rollback_ignores_an_upgrade():
+    assert rules.detect_downgrade_or_rollback(load_fixture("binary_installed.json")) is None
+
+
+def test_downgrade_or_rollback_fires_on_a_rollback():
+    ev = load_fixture("binary_installed.json")
+    ev["event"].update(from_version="2.3.0", to_version="2.2.0", rollback=True)
+    m = rules.detect_downgrade_or_rollback(ev)
+    assert (m["severity"], m["finding"], m["rollback"]) == ("medium", "rollback", True)
+
+
+def test_downgrade_or_rollback_fires_on_a_rollback_that_moves_forward():
+    # Rolling back a downgrade restores the newer binary.
+    ev = load_fixture("binary_installed.json")
+    ev["event"]["rollback"] = True
+    assert rules.detect_downgrade_or_rollback(ev)["finding"] == "rollback"
+
+
+def test_downgrade_or_rollback_fires_on_a_downgrade():
+    ev = load_fixture("binary_installed.json")
+    ev["event"].update(from_version="2.10.0", to_version="2.9.3")
+    m = rules.detect_downgrade_or_rollback(ev)
+    assert (m["finding"], m["from_version"], m["to_version"]) == ("downgrade", "2.10.0", "2.9.3")
+
+
+def test_downgrade_or_rollback_ignores_the_legacy_envelope():
+    assert rules.detect_downgrade_or_rollback(load_fixture("audit_legacy_gateway_start.json")) is None
+
+
+def test_http_path_keeps_install_state_across_requests(capsys):
+    app = consumer.make_app(secret="", skill_dirs=[], logger=__import__("logging").getLogger())
+    client = app.test_client()
+    start = load_fixture("audit_legacy_gateway_start.json")
+    start["detail"]["version"] = "2.3.1"
+    for body in ([load_fixture("binary_installed.json")], [start], [_typed_after(CAUGHT_UP)]):
+        assert client.post("/", data=json.dumps(body).encode("utf-8")).status_code == 200
+    out = [json.loads(ln) for ln in capsys.readouterr().out.split("\n") if ln.strip()]
+    assert [m["finding"] for m in out if m["detection"] == "binary_changed_outside_update"] == [
+        "version_differs"
+    ]
 
 
 # Defensive: a deep copy of the legacy fixture must not affect the

@@ -38,10 +38,25 @@ pins this invariant.
 
 ## Rules
 
-`rules.py` exports eight pure detection functions (detections 1-8)
-plus `evaluate(event, skill_dirs) -> list[match]`. Each rule consumes
-one webhook event dict and returns `Optional[Match]`. Detection 9 is
-not ported to the webhook consumer.
+`rules.py` exports nine pure detection functions (detections 1-8 and
+13) plus `evaluate(event, skill_dirs, installs=None) -> list[match]`.
+Each rule consumes one webhook event dict and returns
+`Optional[Match]`. Detections 9 to 11 are not ported to the webhook
+consumer.
+
+Detection 12 needs state across events, so it lives in
+`InstallTracker`, which `evaluate` runs when given one; the consumer
+keeps one for its lifetime. It holds each `gateway.start` until a
+typed row from the same host, timestamped at or after the start,
+shows the typed feed has caught up, because `binary_installed` is
+written while the gateway is stopped and arrives after the restart.
+`InstallTracker.flush()` judges whatever is still held.
+
+`chain_tamper_severity(chain_broken, alarm_records)` is Detection 5's
+escalation: `high` when the alarm log holds a record for the same
+`(session_id, seq)` within 60 seconds, otherwise `critical`. The
+consumer does not read the alarm log; pass it the parsed lines of
+`audit-alarms.log`.
 
 Detection 4 reads the operator-supplied `--skill-dirs` list; an
 empty list disables it. The consumer logs a one-line note at
@@ -55,5 +70,6 @@ pytest -q
 ```
 
 The fixtures under `tests/fixtures/` match the typed webhook
-envelope (lowercase `kind`, `session_id`, `seq`, ...) and the
-legacy webhook envelope (consumed by Detection 5).
+envelope (lowercase `kind`, `session_id`, `seq`, ...), the legacy
+webhook envelope (consumed by Detections 5 and 12), and one line of
+`audit-alarms.log` (Detection 5's alarm join).

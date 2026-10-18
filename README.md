@@ -13,13 +13,20 @@ binary.
 | 0.1         | 1.3.x – 1.8.x       |
 | 0.2         | 1.3.x – 1.28.x      |
 | 0.3         | 1.3.x – 2.3.x       |
+| 0.4         | 1.3.x – 2.3.x       |
 
 wirken-siem 0.1 shipped detections 1-8 against audit schema 1.3.x
 through 1.8.x. 0.2 adds detections 9 (per-agent cost anomaly) and 10
 (per-agent budget exceeded) and extends support through 1.28.x. 0.3
 adds detection 11 (exec approval prompt disagreed with where it ran),
 which needs audit schema 1.28.0, and extends support through 2.3.x;
-detections 1-10 fire unmodified across the range.
+detections 1-10 fire unmodified across the range. 0.4 corrects
+detection 5, which read the chain-broken row's session from
+`detail.session_id`; the row has always written it as
+`detail.session`, so the join to the alarm log never matched and every
+break read as critical. 0.4 adds detections 12 (binary changed outside
+`wirken update`) and 13 (downgrade or rollback), which need audit
+schema 2.3.0.
 
 Audit-schema changes in the 2.x series, one row per minor that changed
 something. 2.1.0 changed the audit schema not at all.
@@ -186,6 +193,38 @@ any breach the wirken runtime records; `action` distinguishes a block
 runtime does the ceiling comparison, so this detection only surfaces
 the event.
 
+From audit schema 2.2.0, compaction summary calls are charged to the
+agent's budget like a turn; before, they were made but not charged.
+An agent near its ceiling can trip this detection sooner after the
+upgrade.
+
+### Detection 12 minimum
+
+Detection 12 (binary changed outside `wirken update`) compares each
+`gateway.start` row's detail version with the `to_version` of the most
+recent `binary_installed` row from the same host, and needs audit
+schema 2.3.0; `gateway.start` rows from older binaries name no build
+and are skipped. A version that differs is high. So is a start whose
+`commit` is `unknown` or whose `dirty` is not `clean`, while the host
+has an install record: a release binary is built from a clean tree at
+a known commit. `binary_installed` carries no commit, so the commit is
+checked for release provenance rather than compared.
+
+A host with no `binary_installed` row at all is informational, not
+high: installs through `install.sh` and source builds leave no row, so
+a missing row is not evidence of tampering. The detection keys the
+install on the forwarding host name, so two installs on one host read
+as one. `binary_installed` reaches the typed feed after the restart
+that follows it, so each platform waits before judging a start.
+
+### Detection 13 minimum
+
+Detection 13 (downgrade or rollback) fires on a `binary_installed` row
+with `rollback: true` or a `to_version` lower than its `from_version`.
+It needs audit schema 2.3.0 and no forwarder opt-in: `binary_installed`
+is forwarded by default. A rollback can move forward, when it undoes a
+downgrade; it fires either way.
+
 ## Field index
 
 The detections read from these typed `SessionEvent` variants and
@@ -198,7 +237,7 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `AssistantToolCalls`   | `agent_id`, `adapter_id?`, `sender_id?`, `calls[].{id,name,arguments}`  | 1, 2, 3, 4        |
 | `ToolResult`           | `agent_id`, `adapter_id?`, `sender_id?`, `call_id`, `tool_name`, `success`, `output` | 2 |
 | `HttpFetch`            | `agent_id?`, `skill_name?`, `host`, `url`, `outcome`, `http_status_code?`, `bytes` | (none here; reserved) |
-| `AuditLegacy`          | `actor_kind`, `actor_id`, `action`, `target`, `detail`                  | 5                 |
+| `AuditLegacy`          | `actor_kind`, `actor_id`, `action`, `target`, `detail`                  | 5, 12             |
 | `McpEntryRefused`      | `server_name`, `reason` (`signature_invalid` / `unsigned` / `signer_key_missing` / `signer_key_decode_failed` / `delegation_required`) | 6 |
 | `HookDispatched`       | `hook_id`, `tool_name`, `agent_id`, `adapter_id?`, `sender_id?`, `decision.kind` (`allow` / `deny` / `timeout`), `decision.reason?` | 7 |
 | `ToolOutputRedacted`   | `call_id`, `hook_id`, `agent_id`, `adapter_id?`, `sender_id?`, `reason`, `original_sha256`, `original_size`, `redacted_sha256`, `redacted_size` | 8 |
@@ -235,7 +274,7 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `McpServerRestartAbandoned` | `agent_id`, `server_name`, `attempts`, `last_cause`, `last_detail` | (none here; reserved) |
 | `McpCredentialRefetched` | `credential` | (none here; reserved) |
 | `ChainHead`            | `reason` (`session_start` / `session_end` / `checkpoint` / `rotation` / `redaction`), `sequence_range_start`, `sequence_range_end`, `signing_pubkey`, `build?` (`{version, commit, dirty}`, only when `reason` is `session_start`) | (none here; reserved) |
-| `BinaryInstalled`      | `from_version`, `to_version`, `binary_sha256`, `target`, `verifying_key?` (fingerprint `SHA256:...`), `rollback` | (none here; reserved) |
+| `BinaryInstalled`      | `from_version`, `to_version`, `binary_sha256`, `target`, `verifying_key?` (fingerprint `SHA256:...`), `rollback` | 12, 13 |
 
 `SandboxEgressVerdict` is emitted for every request the proxy decides, allow included, not only refusals. An allow row carries the same `sensitivity_basis`, which is what lets a detection assert that a connection was permitted after a given set of reads rather than seeing only what was turned away. Expect one row per proxied CONNECT.
 
@@ -341,6 +380,8 @@ two different rows under one `(session_id, seq)`.
 | 9  | Per-agent LLM cost anomaly         | `LlmResponse`                  | medium            |
 | 10 | Per-agent budget exceeded          | `BudgetExceeded`               | medium            |
 | 11 | Exec prompt disagreed with the run | `ExecLocationDisagreement`     | high              |
+| 12 | Binary changed outside `wirken update` | `AuditLegacy` (`gateway.start`) + `BinaryInstalled` | high; informational with no install record |
+| 13 | Downgrade or rollback              | `BinaryInstalled`              | medium            |
 
 ## Layout
 
@@ -353,8 +394,8 @@ two different rows under one `(session_id, seq)`.
   DCR streams `Custom-WirkenAudit_CL` and `Custom-WirkenSession_CL`.
 - `webhook/` reference Python consumer that verifies the
   `X-Wirken-Signature` HMAC over the raw POST body, then runs
-  detections 1-8 in-process; detection 9 is not ported to the
-  webhook consumer.
+  detections 1-8, 12 and 13 in-process; detections 9 to 11 are not
+  ported to the webhook consumer.
 
 ## Operating notes
 

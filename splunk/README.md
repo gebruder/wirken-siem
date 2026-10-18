@@ -54,7 +54,8 @@ the search still parses cleanly but never matches.
 ## Alarm log (Detection 5)
 
 The audit-alarms log is a separate file (default
-`~/.wirken/audit-alarms.log`, signed Ed25519 entries). Wire it
+`~/.wirken/audit-alarms.log`, one JSON object per line, optionally
+HMAC-SHA256 tagged). Wire it
 into Splunk as a file input with sourcetype `wirken:alarm-log`:
 
 ```
@@ -63,8 +64,9 @@ sourcetype = wirken:alarm-log
 ```
 
 The Detection 5 saved search joins on `(session_id, seq)` with a
-+/-60s window. The alarm log's row carries the same two fields in
-its detail JSON.
++/-60s window. The alarm log's record carries `session_id` and `seq`
+at the top level; the `audit.chain_broken` row carries them in its
+detail as `session` and `seq`.
 
 ## Detection summary
 
@@ -83,3 +85,5 @@ its detail JSON.
 | `wirken_d9_agent_cost_anomaly`                | `wirken:session` | Detection 9, needs `llm_response` opt-in |
 | `wirken_d10_budget_exceeded`                  | `wirken:session` | Detection 10, forwarded by default |
 | `wirken_d11_exec_location_disagreement`       | `wirken:session` | Detection 11, forwarded by default, recorded by `sessions verify` |
+| `wirken_d12_binary_changed_outside_update`    | both             | Detection 12, informational with no install row |
+| `wirken_d13_downgrade_or_rollback`            | `wirken:session` | Detection 13, forwarded by default |

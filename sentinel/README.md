@@ -50,11 +50,12 @@ gap on first deploy.
 ## Alarm log (Detection 5)
 
 The audit-alarms log is a separate ingest path. Wire it into a
-Custom Log DCR named `Custom_WirkenAlarms_CL` with the same
-`SessionId` and `detail.seq` fields the legacy chain-broken row
-carries. The Detection 5 rule joins on
-`(SessionId, Seq)` with a 60s window and promotes severity to
-Critical when no matching alarm row is found.
+Custom Log DCR named `Custom_WirkenAlarms_CL`, each alarm record in
+the `Detail` column; the record carries `session_id` and `seq`. The
+legacy chain-broken row carries the same two in its `Detail` as
+`session` and `seq`. The Detection 5 rule joins on `(SessionId, Seq)`
+with a 60s window and promotes severity to Critical when no matching
+alarm row is found.
 
 ## Detection summary
 
@@ -71,3 +72,5 @@ Critical when no matching alarm row is found.
 | `agent_cost_anomaly.yaml`       | Medium            | Custom_WirkenSession_CL     |
 | `budget_exceeded.yaml`          | Medium            | Custom_WirkenSession_CL     |
 | `exec_location_disagreement.yaml` | High            | Custom_WirkenSession_CL     |
+| `binary_changed_outside_update.yaml` | High / Informational | Custom_WirkenAudit_CL + Custom_WirkenSession_CL |
+| `downgrade_or_rollback.yaml`    | Medium            | Custom_WirkenSession_CL     |

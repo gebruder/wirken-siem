@@ -1,0 +1,47 @@
+id: 7c4f9c41-2a5e-4b8e-a3e0-d1c0a01a0013
+name: Wirken - binary downgraded or rolled back
+description: |
+  Detection 13. Fires on a binary_installed row with rollback true
+  (wirken update --rollback) or a to_version lower than from_version
+  (wirken update --allow-downgrade). A downgrade can reinstate fixed
+  vulnerabilities. Requires audit schema 2.3.0 and the default
+  binary_installed forwarding.
+severity: Medium
+status: Available
+requiredDataConnectors: []
+queryFrequency: PT15M
+queryPeriod: PT15M
+triggerOperator: GreaterThan
+triggerThreshold: 0
+suppressionDuration: PT0M
+suppressionEnabled: false
+tactics:
+  - DefenseEvasion
+relevantTechniques:
+  - T1562
+query: |
+  Custom_WirkenSession_CL
+  | where Kind == "binary_installed"
+  | extend body = parse_json(Event)
+  | extend
+      FromVersion = tostring(body.from_version),
+      ToVersion = tostring(body.to_version),
+      Rollback = tobool(body.rollback)
+  | where Rollback or parse_version(ToVersion) < parse_version(FromVersion)
+  | project
+      TimeGenerated,
+      Hostname,
+      SessionId,
+      Seq,
+      FromVersion,
+      ToVersion,
+      Rollback,
+      Finding = iff(Rollback, "rollback", "downgrade"),
+      BinarySha256 = tostring(body.binary_sha256),
+      Target = tostring(body.target),
+      VerifyingKey = tostring(body.verifying_key)
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: Hostname

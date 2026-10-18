@@ -1,0 +1,71 @@
+id: 7c4f9c41-2a5e-4b8e-a3e0-d1c0a01a0012
+name: Wirken - binary changed outside wirken update
+description: |
+  Detection 12. Compares each gateway.start row's detail version with
+  the to_version of the most recent binary_installed row from the same
+  host. Finding version_differs, or not_a_release_build (commit unknown
+  or a tree that was not clean; a release binary is neither), is High.
+  Finding no_install_record is Informational: installs through
+  install.sh and source builds leave no binary_installed row, so a
+  missing row is not evidence of tampering, and an install older than
+  the 14-day query period reads the same way. binary_installed carries
+  no commit, so the commit is checked for release provenance rather
+  than compared. The window ends 5 minutes back because binary_installed
+  reaches the typed feed after the restart that follows it. Hostname is
+  the install key. Requires audit schema 2.3.0; gateway.start rows from
+  older binaries name no build and are skipped.
+severity: High
+status: Available
+requiredDataConnectors: []
+queryFrequency: PT15M
+queryPeriod: P14D
+triggerOperator: GreaterThan
+triggerThreshold: 0
+suppressionDuration: PT0M
+suppressionEnabled: false
+tactics:
+  - Persistence
+  - DefenseEvasion
+relevantTechniques:
+  - T1554
+query: |
+  let installs =
+    Custom_WirkenSession_CL
+    | where Kind == "binary_installed"
+    | extend body = parse_json(Event)
+    | project InstallTime = TimeGenerated, Hostname, InstalledVersion = tostring(body.to_version);
+  Custom_WirkenAudit_CL
+  | where TimeGenerated between (ago(20m) .. ago(5m))
+  | where Action == "gateway.start"
+  | extend detail = parse_json(Detail)
+  | extend
+      StartedVersion = tostring(detail.version),
+      StartedCommit = tostring(detail.commit),
+      StartedDirty = tostring(detail.dirty)
+  | where isnotempty(StartedVersion)
+  | join kind=leftouter installs on Hostname
+  | where isnull(InstallTime) or InstallTime <= TimeGenerated
+  | summarize arg_max(coalesce(InstallTime, datetime(1970-01-01)), InstallTime, InstalledVersion)
+      by TimeGenerated, Hostname, StartedVersion, StartedCommit, StartedDirty
+  | extend Finding = case(
+      isnull(InstallTime), "no_install_record",
+      StartedVersion != InstalledVersion, "version_differs",
+      StartedCommit == "unknown" or StartedDirty != "clean", "not_a_release_build",
+      "")
+  | where isnotempty(Finding)
+  | extend Severity = iff(Finding == "no_install_record", "Informational", "High")
+  | project
+      TimeGenerated,
+      Hostname,
+      StartedVersion,
+      StartedCommit,
+      StartedDirty,
+      InstalledVersion,
+      InstallTime,
+      Finding,
+      Severity
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: Hostname

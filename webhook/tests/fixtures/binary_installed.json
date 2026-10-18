@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-10-18T22:38:12.771045260+00:00",
+  "session_id": "gateway-install",
+  "seq": 3,
+  "kind": "binary_installed",
+  "level": "info",
+  "trust": "user",
+  "event": {
+    "kind": "binary_installed",
+    "from_version": "2.2.0",
+    "to_version": "2.3.0",
+    "binary_sha256": "476be60e58005e9908787499019a6acca782d30858217484d6698f2fc87d43ef",
+    "target": "x86_64-unknown-linux-musl",
+    "verifying_key": "SHA256:tzlfNHy4G1KIsmAR+cM3MGwVndheh2ak/usA6rw7SuE",
+    "rollback": false
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

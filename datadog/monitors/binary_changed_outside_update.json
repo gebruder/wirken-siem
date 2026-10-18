@@ -1,0 +1,22 @@
+{
+  "name": "Wirken: binary changed outside wirken update",
+  "type": "log alert",
+  "query": "logs(\"@ddsource:wirken @wirken.action:gateway.start @install.recorded:true (-@install.version_matches:true OR @wirken.detail.commit:unknown OR -@wirken.detail.dirty:clean)\").index(\"main\").rollup(\"count\").by(\"host\").last(\"15m\") > 0",
+  "message": "A Wirken gateway started a binary that is not the release the last `wirken update` on this host installed.\n\nDetection: binary_changed_outside_update (12)\nSeverity baseline: high\n\nThe started version (@wirken.detail.version) differs from the to_version of the host's most recent binary_installed row (@install.to_version), or the binary is not a release build: @wirken.detail.commit unknown, or @wirken.detail.dirty other than clean. binary_installed carries no commit, so the commit is checked for release provenance rather than compared. Pivot on host, @wirken.detail.version, @wirken.detail.commit, @wirken.detail.dirty.\n\nRequires audit schema 2.3.0 and the @install.* pipeline attributes (see datadog/README.md). The 5-minute evaluation delay covers binary_installed reaching the typed feed after the restart that follows it.\n\n@security-team",
+  "tags": [
+    "service:wirken",
+    "detection:binary_changed_outside_update",
+    "source:wirken-siem"
+  ],
+  "options": {
+    "thresholds": {
+      "critical": 0
+    },
+    "notify_audit": true,
+    "include_tags": true,
+    "evaluation_delay": 300,
+    "new_group_delay": 60,
+    "renotify_interval": 30
+  },
+  "priority": 2
+}

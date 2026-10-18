@@ -57,6 +57,9 @@ def verify_signature(raw_body: bytes, header_value: str | None, secret: str) -> 
 
 def make_app(secret: str, skill_dirs: list[str], logger: logging.Logger) -> Flask:
     app = Flask(__name__)
+    # Detection 12 correlates rows across requests, so its state lives
+    # as long as the app.
+    installs = rules.InstallTracker()
 
     @app.post("/")
     def receive():  # pyright: ignore[reportUnusedFunction]
@@ -77,7 +80,7 @@ def make_app(secret: str, skill_dirs: list[str], logger: logging.Logger) -> Flas
         for event in events:
             if not isinstance(event, dict):
                 continue
-            for match in rules.evaluate(event, skill_dirs):
+            for match in rules.evaluate(event, skill_dirs, installs):
                 sys.stdout.write(json.dumps(match) + "\n")
                 emitted += 1
         sys.stdout.flush()

@@ -1,13 +1,13 @@
 {
-  "timestamp": "2026-05-11T12:30:00Z",
+  "timestamp": "2026-10-18T12:30:00.512304911+00:00",
   "actor_kind": "service",
   "actor_id": "audit",
   "action": "audit.chain_broken",
   "target": "audit.db",
   "channel": null,
-  "session": "sess-1",
+  "session": null,
   "detail": {
-    "session_id": "sess-1",
+    "session": "sess-1",
     "seq": 42,
     "expected_hash": "aabb",
     "actual_hash": "ccdd",
