@@ -14,6 +14,7 @@ binary.
 | 0.2         | 1.3.x – 1.28.x      |
 | 0.3         | 1.3.x – 2.3.x       |
 | 0.4         | 1.3.x – 2.3.x       |
+| 0.4.1       | 1.3.x – 2.3.x       |
 
 wirken-siem 0.1 shipped detections 1-8 against audit schema 1.3.x
 through 1.8.x. 0.2 adds detections 9 (per-agent cost anomaly) and 10
@@ -26,7 +27,11 @@ detection 5, which read the chain-broken row's session from
 `detail.session`, so the join to the alarm log never matched and every
 break read as critical. 0.4 adds detections 12 (binary changed outside
 `wirken update`) and 13 (downgrade or rollback), which need audit
-schema 2.3.0.
+schema 2.3.0. 0.4.1 corrects the Splunk searches to read fields where
+HEC indexes them: a typed row's `kind` at the top level and its
+payload under `event.`, a legacy row's detail under `detail.`. Every
+Splunk detection, 1 to 13, is checked against rows posted to HEC in
+the forwarder's own shape.
 
 Audit-schema changes in the 2.x series, one row per minor that changed
 something. 2.1.0 changed the audit schema not at all.

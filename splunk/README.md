@@ -29,6 +29,18 @@ The detections read from two HEC sourcetypes:
   forwarder). Same HEC, distinct sourcetype so search and
   retention can split.
 
+HEC indexes the object the forwarder sends as `event`, so field
+paths start inside it. A typed row is searchable as `kind`,
+`level`, `session_id`, `seq` and `trust`, with the `SessionEvent`
+payload under `event.` (`event.agent_id`, `event.calls{}.name`,
+`event.to_version`). A legacy row is searchable as `action`,
+`actor_id`, `actor_kind`, `target`, `channel` and `session`, with its
+detail under `detail.` (`detail.seq`, `detail.version`); there is no
+`detail` field of its own, so `spath input=detail` finds nothing. The
+macros in `macros.conf` read these paths; the saved searches were
+checked against rows posted to Splunk 10.6.0's HEC in the forwarder's
+own shape.
+
 ## Lookup: `wirken_skill_dirs`
 
 Detection 4 reads from a lookup table named `wirken_skill_dirs`.
