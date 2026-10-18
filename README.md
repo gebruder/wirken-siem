@@ -12,16 +12,25 @@ binary.
 |-------------|---------------------|
 | 0.1         | 1.3.x – 1.8.x       |
 | 0.2         | 1.3.x – 1.28.x      |
-| 0.3         | 1.3.x – 1.28.x      |
+| 0.3         | 1.3.x – 2.3.x       |
 
 wirken-siem 0.1 shipped detections 1-8 against audit schema 1.3.x
 through 1.8.x. 0.2 adds detections 9 (per-agent cost anomaly) and 10
 (per-agent budget exceeded) and extends support through 1.28.x. 0.3
 adds detection 11 (exec approval prompt disagreed with where it ran),
-which needs audit schema 1.28.0; detections 1-10 fire unmodified across
-the range.
+which needs audit schema 1.28.0, and extends support through 2.3.x;
+detections 1-10 fire unmodified across the range.
 
-Every audit-schema change from 1.4.0 through 1.28.0 has been
+Audit-schema changes in the 2.x series, one row per minor that changed
+something. 2.1.0 changed the audit schema not at all.
+
+| Wirken | What changed |
+|--------|--------------|
+| 2.0.x  | Twelve typed variants: `llm_request_failed`; the adapter lifecycle events `adapter_connect`, `adapter_disconnect`, `adapter_restart` and `adapter_restart_abandoned`; the MCP server lifecycle events `mcp_server_sandboxed`, `mcp_server_unsandboxed`, `mcp_server_exited`, `mcp_server_restart` and `mcp_server_restart_abandoned`; `mcp_credential_refetched`; and `leak_refused`. `mcp_server` on `SandboxEgressVerdict`. A level on every typed row. The `connection.panic` legacy action. Sequence numbers are never reused after a rewind. No 2.x binary writes the `wasm_skill_call` `Action` label. |
+| 2.2.x  | `request_bytes` and `purpose` on `LlmRequest`. Compaction summary and tool-call probe model calls are recorded as `llm_request` / `llm_response` pairs. |
+| 2.3.x  | The `binary_installed` typed variant. `build` on the `SessionStart` chain head. A `{version, commit, dirty}` detail on the `gateway.start` legacy row. |
+
+Every audit-schema change from 1.4.0 through 2.3.0 has been
 forward-compatible (`#[serde(default)]` on new fields, new variants
 sitting alongside existing ones): 1.8.0 added a `wasm_skill_call`
 value to the `Action` label vocabulary (it rides the existing
@@ -48,8 +57,21 @@ variants, plus `text` on `AssistantToolCalls`, `redaction`,
 `tier` and `expires_at` on `PermissionApproved`, and `sandbox` on
 `ToolResult`. 1.24.1 through 1.27.0 changed the audit schema not at
 all. 1.28.0 added the `exec_location_disagreement` typed variant, plus
-`exec_location` on `PermissionApproved` and `PermissionDenied`. The `Action` label vocabulary is unchanged since
-1.19.0. Existing detection content fires unmodified across the range.
+`exec_location` on `PermissionApproved` and `PermissionDenied`. 2.0.0
+added the twelve typed variants in the table above, plus `mcp_server`
+on `SandboxEgressVerdict`, a `level` on every typed row and the
+`connection.panic` legacy action; it removed the Wasm skill loader, so
+no 2.x binary writes `wasm_skill_call`, which rows written before it
+still carry. 2.1.0 changed the audit schema not at all. 2.2.0 added
+`request_bytes` and `purpose` on `LlmRequest`, both optional and
+omitted for a normal turn. 2.3.0 added the `binary_installed` typed
+variant, `build` on `ChainHead`, optional and only on the head after
+`session_start`, and a detail on the `gateway.start` legacy row, which
+was null before. A binary from 1.7.0 on that is older than a row reads
+a kind it does not know as schema drift, reported and skipped, not as
+a broken chain, and ignores fields it does not know. The `Action` label vocabulary has
+gained nothing since 1.19.0. Existing detection content fires
+unmodified across the range.
 
 `SessionEvent` variants added since 1.4.x. Detections 6, 7, and 8
 consume `McpEntryRefused`, `HookDispatched`, and
@@ -82,6 +104,20 @@ consume `McpEntryRefused`, `HookDispatched`, and
 - `PermissionRevoked` (1.24.0, an operator removing a stored grant)
 - `ExecLocationDisagreement` (1.28.0, `wirken sessions verify` finding
   an exec that ran somewhere other than its approval prompt said)
+- `LlmRequestFailed` (2.0.0, a model call that failed, in place of its
+  `LlmResponse`)
+- `AdapterConnect`, `AdapterDisconnect`, `AdapterRestart`,
+  `AdapterRestartAbandoned` (2.0.0, an adapter's connection and
+  restarts)
+- `McpServerSandboxed`, `McpServerUnsandboxed`, `McpServerExited`,
+  `McpServerRestart`, `McpServerRestartAbandoned` (2.0.0, what each
+  stdio MCP server started with, and a contained server's exits and
+  restarts)
+- `McpCredentialRefetched` (2.0.0, the gateway giving the MCP proxy a
+  credential's current vault value after a server refused it)
+- `LeakRefused` (2.0.0, content carrying a stored secret, refused)
+- `BinaryInstalled` (2.3.0, `wirken update` or `--rollback` swapping
+  the installed binary)
 
 Fields added to existing variants since 1.4.x:
 
@@ -110,6 +146,14 @@ Fields added to existing variants since 1.4.x:
 - `PermissionApproved` / `PermissionDenied`: `exec_location` (1.28.0),
   `{mode, text}` for an `exec` an operator was asked about: the line
   the approval prompt showed.
+- `SandboxEgressVerdict`: `mcp_server` (2.0.0), the contained MCP
+  server the request came from; absent for an agent's own `exec`.
+- `LlmRequest`: `request_bytes` (2.2.0), the size of the messages and
+  tool definitions the call sent, what `messages_hash` and `tools_hash`
+  cover; `purpose` (2.2.0), absent for a normal turn, otherwise
+  `compaction_summary` or `tool_call_probe`.
+- `ChainHead`: `build` (2.3.0), `{version, commit, dirty}`, only on the
+  head written after `session_start`.
 
 ### Detection 9 minimum
 
@@ -125,6 +169,12 @@ from its first hour: an agent compromised or misconfigured on day one
 reads as its own baseline. See `wirken/docs/cost-monitoring.md`
 (Enforcement) and detection 10 for the absolute-ceiling complement,
 now shipped.
+
+From audit schema 2.2.0, compaction summary calls produce priced
+`llm_response` rows; before, they were made but not recorded. An agent
+whose conversations compact shows a one-time step up in recorded cost
+after the upgrade, which can trip the baseline-relative anomaly until
+the baseline absorbs it.
 
 ### Detection 10 minimum
 
@@ -175,6 +225,17 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `AdapterDisconnect`    | `adapter_id`, `channel`, `pubkey_fingerprint`, `reason` (`ended` / `panic`) | (none here; reserved) |
 | `AdapterRestart`       | `adapter_id`, `channel`, `attempt`, `cause` (`process_exited` / `connection_ended` / `connection_panicked` / `spawn_failed`), `exit`, `delay_ms`, `connected_for_ms?` | (none here; reserved) |
 | `AdapterRestartAbandoned` | `adapter_id`, `channel`, `attempts`, `last_cause`, `last_exit` | (none here; reserved) |
+| `LlmRequest`           | `agent_id`, `credential_id?`, `sender_id?`, `request_id`, `provider`, `model`, `messages_hash`, `tools_hash`, `tools_hash_version`, `request_bytes?`, `purpose?` (`compaction_summary` / `tool_call_probe`; absent for a turn) | (none here; reserved) |
+| `LlmRequestFailed`     | `agent_id`, `credential_id?`, `sender_id?`, `request_id`, `error`, `latency_ms` | (none here; reserved) |
+| `LeakRefused`          | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `credential`, `surface` (`tool_output` / `tool_arguments` / `provider_request` / `reply` / `user_message` / `skill_load`), `tool_name?`, `server_name?`, `skill_name?` | (none here; reserved) |
+| `McpServerSandboxed`   | `agent_id`, `server_name`, `container_id`, `image`, `image_id?`, `image_digest?`, `runtime` (`docker` / `gvisor` / `host`), `memory_bytes`, `nano_cpus`, `pids`, `mounts[]`, `egress_hosts[]`, `secrets_as_files[]`, `secrets_in_env[]` | (none here; reserved) |
+| `McpServerUnsandboxed` | `agent_id`, `server_name` | (none here; reserved) |
+| `McpServerExited`      | `agent_id`, `server_name`, `container_id`, `exit_code?`, `stopped_by_proxy` | (none here; reserved) |
+| `McpServerRestart`     | `agent_id`, `server_name`, `attempt`, `cause` (`exited` / `start_failed` / `initialize_failed`), `detail`, `delay_ms`, `ran_for_ms?` | (none here; reserved) |
+| `McpServerRestartAbandoned` | `agent_id`, `server_name`, `attempts`, `last_cause`, `last_detail` | (none here; reserved) |
+| `McpCredentialRefetched` | `credential` | (none here; reserved) |
+| `ChainHead`            | `reason` (`session_start` / `session_end` / `checkpoint` / `rotation` / `redaction`), `sequence_range_start`, `sequence_range_end`, `signing_pubkey`, `build?` (`{version, commit, dirty}`, only when `reason` is `session_start`) | (none here; reserved) |
+| `BinaryInstalled`      | `from_version`, `to_version`, `binary_sha256`, `target`, `verifying_key?` (fingerprint `SHA256:...`), `rollback` | (none here; reserved) |
 
 `SandboxEgressVerdict` is emitted for every request the proxy decides, allow included, not only refusals. An allow row carries the same `sensitivity_basis`, which is what lets a detection assert that a connection was permitted after a given set of reads rather than seeing only what was turned away. Expect one row per proxied CONNECT.
 
@@ -208,10 +269,62 @@ prompt said a container and the result says `runtime: host` is the
 mismatch `wirken sessions verify` reports as an `exec_location`
 divergence.
 
+Of the variants added in 2.0.0, the typed forwarder sends
+`LeakRefused`, the five MCP server events, `McpCredentialRefetched` and
+the four adapter events by default; `LlmRequestFailed` is outside the
+default set, like `LlmRequest` and `LlmResponse`, because a provider's
+error text can quote the request it refused. The MCP server events are
+written on the `gateway-mcp` lane and `McpCredentialRefetched` on
+`gateway-mcp-credentials`; `LeakRefused` names the credential, never
+its value, on the session the content belonged to. `LlmRequestFailed`
+carries the `request_id` of the `LlmRequest` it ends.
+
+`LlmRequest.purpose` marks model calls made alongside the conversation.
+Compaction summary calls happened before 2.2.0 but were not recorded;
+from 2.2.0 each is an `llm_request` with `purpose: compaction_summary`
+and an `llm_response` priced and charged to the agent's budget like a
+turn. `tool_call_probe` is Lyrik's preflight call. `LlmRequest` is
+outside the default forwarded set, so a SIEM tells these calls apart
+from turns only when `llm_request` is listed in
+`typed_include_variants`.
+
+`BinaryInstalled` is forwarded by default. It is written on the
+`gateway-install` lane, outside any session, with no agent, adapter or
+sender. `rollback` is true for `wirken update --rollback`;
+`verifying_key` is the fingerprint of the release key whose signed
+manifest the installed binary's sha256 was checked against, and on a
+rollback the one recorded when the restored binary was set aside,
+absent when none was. A row records that the operator ran the command;
+it does not prove the binary on disk was not changed by other means.
+
+`ChainHead` is forwarded by default. Its `build` names the binary that
+opened the session, so a chain segment can be attributed to a build
+however that build was installed. The `gateway.start` legacy row
+carries the same `{version, commit, dirty}` in its detail from 2.3.0;
+before, its detail was null. `commit` is a short hash or `unknown`;
+`dirty` is `clean`, `dirty` or `unknown`.
+
+`connection.panic` (2.0.0) is a legacy row for a connection task that
+panicked: target the adapter id, or the connection kind when there is
+none, and detail `{kind, adapter_id, location, payload_len,
+payload_sha256}`. Datadog sends it with `status: error`; the other
+targets carry no level on legacy rows.
+
 Row metadata on every typed event: `session_id`, `seq`, `ts`,
-`trust`, `kind`. The forwarder wraps each row in a per-target
-envelope; see the platform READMEs for the exact field names per
-target.
+`trust`, `kind`, and from 2.0.0 `level`. The forwarder wraps each row
+in a per-target envelope; see the platform READMEs for the exact field
+names per target. `level` is `event.level` on Splunk, `level` on the
+webhook, `Level` on Sentinel and `status` on Datadog, where it was
+always `info` before. It is `info` for most variants; the adapter and
+MCP server lifecycle events take it from their reason or cause,
+`LeakRefused` is `error` and `LlmRequestFailed` is `warn`.
+
+From 2.0.0 a sequence number is never reused: a rewind's marker takes
+the number after the highest the session issued, so `(session_id,
+seq)` names one row for the life of the session and deleted rows leave
+a gap. Through 1.28.x, rows written after a rewind reused the deleted
+rows' numbers, so a SIEM that kept rows from before the rewind can hold
+two different rows under one `(session_id, seq)`.
 
 ## Detection summary
 
