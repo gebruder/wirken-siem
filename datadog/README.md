@@ -152,7 +152,7 @@ seen AND no matching alarm-log row within 60s).
 | Skill-dir exec                | `monitors/skill_dir_exec.json`    |
 | Chain tamper                  | `monitors/chain_tamper.json`      |
 | MCP entry refused             | `monitors/mcp_entry_refused.json` |
-| Veto hook deny or timeout     | `monitors/hook_refused.json`      |
+| Veto hook deny, timeout, unavailable | `monitors/hook_refused.json`      |
 | Tool output redacted          | `monitors/tool_output_redacted.json` |
 | Per-agent LLM cost anomaly    | `monitors/agent_cost_anomaly.json` |
 | Per-agent budget exceeded     | `monitors/budget_exceeded.json`   |

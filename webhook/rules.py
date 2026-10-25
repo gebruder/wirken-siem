@@ -373,13 +373,12 @@ def detect_mcp_entry_refused(event: Event) -> Match | None:
 
 
 # ---------------------------------------------------------------
-# Detection 7: veto hook denied or timed out
+# Detection 7: veto hook denied, timed out or not connected
 # ---------------------------------------------------------------
 #
-# Fires on HookDispatched rows whose decision.kind is deny or
-# timeout. Timeout is fail-closed in production (the tool call is
-# refused); it lands on the chain so reviewers distinguish timeout
-# from explicit deny.
+# Fires on HookDispatched rows whose decision.kind is deny, timeout
+# or unavailable (3.0.0: a registered hook that is not connected).
+# Timeout and unavailable refuse the tool call.
 
 
 def detect_hook_refused(event: Event) -> Match | None:
@@ -388,7 +387,7 @@ def detect_hook_refused(event: Event) -> Match | None:
     body = event["event"]
     decision = body.get("decision") or {}
     kind = decision.get("kind") if isinstance(decision, dict) else None
-    if kind not in ("deny", "timeout"):
+    if kind not in ("deny", "timeout", "unavailable"):
         return None
     return {
         "detection": "hook_refused",

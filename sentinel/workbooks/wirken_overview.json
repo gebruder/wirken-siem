@@ -90,9 +90,9 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "Custom_WirkenSession_CL\n| where Kind == 'hook_dispatched'\n| extend body = parse_json(Event)\n| extend decision_kind = tostring(body.decision.kind)\n| where decision_kind in ('deny', 'timeout')\n| summarize count() by bin(TimeGenerated, 15m), decision_kind",
+        "query": "Custom_WirkenSession_CL\n| where Kind == 'hook_dispatched'\n| extend body = parse_json(Event)\n| extend decision_kind = tostring(body.decision.kind)\n| where decision_kind in ('deny', 'timeout', 'unavailable')\n| summarize count() by bin(TimeGenerated, 15m), decision_kind",
         "size": 0,
-        "title": "Detection 7: veto hook deny or timeout (15m)",
+        "title": "Detection 7: veto hook deny, timeout or unavailable (15m)",
         "queryType": 0,
         "resourceType": "microsoft.operationalinsights/workspaces",
         "visualization": "linechart"

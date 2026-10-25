@@ -92,7 +92,7 @@ detail as `session` and `seq`.
 | `wirken_d4_skill_dir_exec`                    | `wirken:session` | Detection 4, needs lookup |
 | `wirken_d5_chain_tamper`                      | `wirken:audit`   | Detection 5 |
 | `wirken_d6_mcp_entry_refused`                 | `wirken:session` | Detection 6 |
-| `wirken_d7_hook_refused`                      | `wirken:session` | Detection 7, fires on decision.kind in {deny, timeout} |
+| `wirken_d7_hook_refused`                      | `wirken:session` | Detection 7, fires on decision.kind in {deny, timeout, unavailable} |
 | `wirken_d8_tool_output_redacted`              | `wirken:session` | Detection 8 |
 | `wirken_d9_agent_cost_anomaly`                | `wirken:session` | Detection 9, needs `llm_response` opt-in |
 | `wirken_d10_budget_exceeded`                  | `wirken:session` | Detection 10, forwarded by default |

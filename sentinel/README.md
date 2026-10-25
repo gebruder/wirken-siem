@@ -13,9 +13,13 @@ The detections read from two Data Collection Rules (DCRs):
 - `Custom-WirkenSession_CL`: typed SessionEvent rows from the
   wirken `sentinel_typed.endpoint`. Column-pinned to the typed
   shape: `TimeGenerated`, `SessionId`, `Seq`, `Kind`, `Level`,
-  `Trust`, `AgentId`, `AdapterId`, `SenderId`, `Event`, `Hostname`.
-  `Level` (string) has to be declared in the DCR stream
-  declaration and the table for Sentinel to store it.
+  `Trust`, `AgentId`, `AdapterId`, `SenderId`, `DecidedBy`, `Event`,
+  `Hostname`. `Level` (string, from Wirken 2.0.0) and `DecidedBy`
+  (string, from 3.0.0) have to be declared in the DCR stream
+  declaration and the table for Sentinel to store them. `DecidedBy` is
+  the verified identity of whoever approved or denied a request, on
+  `permission_approved` and `permission_denied` rows; empty on every
+  other row.
 
 Configure both DCRs in your Sentinel workspace before deploying
 the rules. The wirken side ships the row shapes; the DCR

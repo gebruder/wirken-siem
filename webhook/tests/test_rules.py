@@ -286,6 +286,13 @@ def test_hook_refused_fires_on_timeout():
     assert m["decision_reason"] is None
 
 
+def test_hook_refused_fires_on_unavailable():
+    ev = load_fixture("hook_dispatched_unavailable.json")
+    m = rules.detect_hook_refused(ev)
+    assert m is not None
+    assert m["decision_kind"] == "unavailable"
+
+
 def test_hook_refused_does_not_fire_on_allow():
     ev = load_fixture("hook_dispatched_allow.json")
     assert rules.detect_hook_refused(ev) is None

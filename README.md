@@ -15,6 +15,7 @@ binary.
 | 0.3         | 1.3.x – 2.3.x       |
 | 0.4         | 1.3.x – 2.3.x       |
 | 0.4.1       | 1.3.x – 2.3.x       |
+| 0.5         | 1.3.x – 3.0.x       |
 
 wirken-siem 0.1 shipped detections 1-8 against audit schema 1.3.x
 through 1.8.x. 0.2 adds detections 9 (per-agent cost anomaly) and 10
@@ -31,18 +32,23 @@ schema 2.3.0. 0.4.1 corrects the Splunk searches to read fields where
 HEC indexes them: a typed row's `kind` at the top level and its
 payload under `event.`, a legacy row's detail under `detail.`. Every
 Splunk detection, 1 to 13, is checked against rows posted to HEC in
-the forwarder's own shape.
+the forwarder's own shape. 0.5 extends support through 3.0.x and has
+detection 7 fire on `unavailable` too: from 3.0.0 a registered veto
+hook that is not connected refuses the call with that decision.
+Detections 1-6 and 8-13 fire unmodified.
 
-Audit-schema changes in the 2.x series, one row per minor that changed
-something. 2.1.0 changed the audit schema not at all.
+Audit-schema changes in the 2.x and 3.x series, one row per minor that
+changed something. 2.1.0, 2.4.x and 2.5.x changed the audit schema not
+at all.
 
 | Wirken | What changed |
 |--------|--------------|
 | 2.0.x  | Twelve typed variants: `llm_request_failed`; the adapter lifecycle events `adapter_connect`, `adapter_disconnect`, `adapter_restart` and `adapter_restart_abandoned`; the MCP server lifecycle events `mcp_server_sandboxed`, `mcp_server_unsandboxed`, `mcp_server_exited`, `mcp_server_restart` and `mcp_server_restart_abandoned`; `mcp_credential_refetched`; and `leak_refused`. `mcp_server` on `SandboxEgressVerdict`. A level on every typed row. The `connection.panic` legacy action. Sequence numbers are never reused after a rewind. No 2.x binary writes the `wasm_skill_call` `Action` label. |
 | 2.2.x  | `request_bytes` and `purpose` on `LlmRequest`. Compaction summary and tool-call probe model calls are recorded as `llm_request` / `llm_response` pairs. |
 | 2.3.x  | The `binary_installed` typed variant. `build` on the `SessionStart` chain head. A `{version, commit, dirty}` detail on the `gateway.start` legacy row. |
+| 3.0.x  | Fourteen typed variants: `inbound_sender_refused`, `inbound_sender_added`, `inbound_sender_removed`, `approver_added`, `approver_removed`, `approval_chat_set`, `operator_command_refused`, `update_refused`, `mcp_credential_refresh_discarded`, `credential_destination_refused`, `credential_destination_granted`, `credential_destination_revoked`, `credential_handed_out` and `vault_migrated`. `approved_by` on `PermissionApproved` now holds the verified identity of the approver; the display name moves to `approver_display`. `denied_by` and `denier_display` on `PermissionDenied`. `channel` on `PermissionApproved`, `PermissionRenewed`, `PermissionRevoked`, `PermissionGrantExpired` and `PermissionGrantPruned`. `unavailable` in `HookDispatched` and `EgressHookDispatched` decisions. The Sentinel `DecidedBy` column. |
 
-Every audit-schema change from 1.4.0 through 2.3.0 has been
+Every audit-schema change from 1.4.0 through 3.0.0 has been
 forward-compatible (`#[serde(default)]` on new fields, new variants
 sitting alongside existing ones): 1.8.0 added a `wasm_skill_call`
 value to the `Action` label vocabulary (it rides the existing
@@ -79,7 +85,11 @@ still carry. 2.1.0 changed the audit schema not at all. 2.2.0 added
 omitted for a normal turn. 2.3.0 added the `binary_installed` typed
 variant, `build` on `ChainHead`, optional and only on the head after
 `session_start`, and a detail on the `gateway.start` legacy row, which
-was null before. A binary from 1.7.0 on that is older than a row reads
+was null before. 3.0.0 added the fourteen variants and the optional
+fields in the table above. One change is in meaning rather than shape:
+from 3.0.0 `approved_by` is a verified identity (a channel approver's
+platform user id, `operator:<key id>` or `webchat:<label>`), where it
+held a display name before; read `approver_display` for the name. A binary from 1.7.0 on that is older than a row reads
 a kind it does not know as schema drift, reported and skipped, not as
 a broken chain, and ignores fields it does not know. The `Action` label vocabulary has
 gained nothing since 1.19.0. Existing detection content fires
@@ -130,6 +140,20 @@ consume `McpEntryRefused`, `HookDispatched`, and
 - `LeakRefused` (2.0.0, content carrying a stored secret, refused)
 - `BinaryInstalled` (2.3.0, `wirken update` or `--rollback` swapping
   the installed binary)
+- `InboundSenderRefused`, `InboundSenderAdded`, `InboundSenderRemoved`
+  (3.0.0, the inbound sender allowlist: a message dropped, and the
+  operator's changes to who may drive an agent)
+- `ApproverAdded`, `ApproverRemoved`, `ApprovalChatSet` (3.0.0, the
+  operator's changes to who may approve and where prompts post)
+- `OperatorCommandRefused` (3.0.0, `wirken senders` or `wirken
+  approvers` refused inside a Wirken `exec`)
+- `UpdateRefused` (3.0.0, `wirken update` refused inside a Wirken
+  `exec`, or a rollback a migrated vault would break)
+- `McpCredentialRefreshDiscarded` (3.0.0, a refreshed OAuth credential
+  not written because the entry changed during the refresh)
+- `CredentialDestinationRefused`, `CredentialDestinationGranted`,
+  `CredentialDestinationRevoked`, `CredentialHandedOut`, `VaultMigrated`
+  (3.0.0, where vault credentials may go and where they went)
 
 Fields added to existing variants since 1.4.x:
 
@@ -166,6 +190,14 @@ Fields added to existing variants since 1.4.x:
   `compaction_summary` or `tool_call_probe`.
 - `ChainHead`: `build` (2.3.0), `{version, commit, dirty}`, only on the
   head written after `session_start`.
+- `PermissionApproved`: `approver_display` (3.0.0); `approved_by` holds
+  the verified identity from 3.0.0.
+- `PermissionDenied`: `denied_by`, `denier_display` (3.0.0), absent when
+  no one decided (a timeout or a gate refusal).
+- `PermissionApproved`, `PermissionRenewed`, `PermissionRevoked`,
+  `PermissionGrantExpired`, `PermissionGrantPruned`: `channel` (3.0.0),
+  the channel a persisted grant applies on; absent for a one-shot
+  approval and for a grant pruned because it was stored without one.
 
 ### Detection 9 minimum
 
@@ -244,7 +276,7 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `HttpFetch`            | `agent_id?`, `skill_name?`, `host`, `url`, `outcome`, `http_status_code?`, `bytes` | (none here; reserved) |
 | `AuditLegacy`          | `actor_kind`, `actor_id`, `action`, `target`, `detail`                  | 5, 12             |
 | `McpEntryRefused`      | `server_name`, `reason` (`signature_invalid` / `unsigned` / `signer_key_missing` / `signer_key_decode_failed` / `delegation_required`) | 6 |
-| `HookDispatched`       | `hook_id`, `tool_name`, `agent_id`, `adapter_id?`, `sender_id?`, `decision.kind` (`allow` / `deny` / `timeout`), `decision.reason?` | 7 |
+| `HookDispatched`       | `hook_id`, `tool_name`, `agent_id`, `adapter_id?`, `sender_id?`, `decision.kind` (`allow` / `deny` / `timeout` / `unavailable`), `decision.reason?` | 7 |
 | `ToolOutputRedacted`   | `call_id`, `hook_id`, `agent_id`, `adapter_id?`, `sender_id?`, `reason`, `original_sha256`, `original_size`, `redacted_sha256`, `redacted_size` | 8 |
 | `LlmResponse`          | `agent_id`, `credential_id?`, `sender_id?`, `total_cost_usd_micros?`, `input_cost_usd_micros?`, `output_cost_usd_micros?` | 9 |
 | `BudgetExceeded`       | `agent_id`, `credential_id?`, `action` (`alerted` / `blocked`), `window`, `window_spend_usd_micros`, `ceiling_usd_micros` | 10 |
@@ -256,10 +288,10 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `ImportCompleted`      | `actor`, `source_id`, `provider`, `source_account`, `archive_sha256`, `added`, `updated`, `unchanged`, `unorderable`, `skipped` | (none here; reserved) |
 | `ImportedChatRead`     | `agent_id`, `adapter_id?`, `sender_id?`, `source_id`, `source_account?`, `conversation_uuid`, `message_count` | (none here; reserved) |
 | `ImportedChatSearched` | `agent_id`, `adapter_id?`, `sender_id?`, `source_id?`, `outcome` (`hits` / `empty` / `refused`), `match_count`, `query_digest?` | (none here; reserved) |
-| `PermissionGrantExpired` | `agent_id`, `adapter_id?`, `sender_id?`, `action_key`, `tool?`, `tier?`, `expired_at`, `detected_by?` (`tool_call` / `store_open`) | (none here; reserved) |
-| `PermissionGrantPruned` | `agent_id`, `action_key`, `expires_at` | (none here; reserved) |
-| `PermissionRenewed`    | `agent_id`, `adapter_id?`, `sender_id?`, `action_key`, `approved_by`, `approved_via?`, `previous_expires_at`, `expires_at` | (none here; reserved) |
-| `PermissionRevoked`    | `agent_id`, `action_key`, `revoked_by`, `tier?`, `expires_at?` | (none here; reserved) |
+| `PermissionGrantExpired` | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `action_key`, `tool?`, `tier?`, `expired_at`, `detected_by?` (`tool_call` / `store_open`) | (none here; reserved) |
+| `PermissionGrantPruned` | `agent_id`, `channel?`, `action_key`, `expires_at` | (none here; reserved) |
+| `PermissionRenewed`    | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `action_key`, `approved_by`, `approved_via?`, `previous_expires_at`, `expires_at` | (none here; reserved) |
+| `PermissionRevoked`    | `agent_id`, `channel?`, `action_key`, `revoked_by`, `tier?`, `expires_at?` | (none here; reserved) |
 | `PermissionApprovalRefused` | `request_id`, `action_key?`, `caller`, `reason` (`unauthorized_actor` / `wrong_channel` / `wrong_conversation`), `adapter_id?` | (none here; reserved) |
 | `SubagentSessionBound` | `agent_id`, `parent_session_id`, `depth`, `max_permission_tier`, `tools_granted[]`, `offered_tools[]` | (none here; reserved) |
 | `DeliveryConfirmed`    | `target`, `message_id`, `adapter_id?` | (none here; reserved) |
@@ -280,6 +312,21 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `McpCredentialRefetched` | `credential` | (none here; reserved) |
 | `ChainHead`            | `reason` (`session_start` / `session_end` / `checkpoint` / `rotation` / `redaction`), `sequence_range_start`, `sequence_range_end`, `signing_pubkey`, `build?` (`{version, commit, dirty}`, only when `reason` is `session_start`) | (none here; reserved) |
 | `BinaryInstalled`      | `from_version`, `to_version`, `binary_sha256`, `target`, `verifying_key?` (fingerprint `SHA256:...`), `rollback` | 12, 13 |
+| `EgressHookDispatched` | `hook_id`, `tool_name`, `agent_id`, `adapter_id?`, `sender_id?`, `decision.kind` (`allow` / `replace` / `refuse` / `timeout` / `unavailable`) | (none here; reserved) |
+| `InboundSenderRefused` | `channel`, `adapter_id`, `sender_id`, `conversation_id`, `reason` (`not_allowed` / `allowlist_unreadable`), `suppressed`, `suppressed_on_lane` | (none here; reserved) |
+| `InboundSenderAdded`   | `channel`, `id`, `group`, `label`, `added_by` | (none here; reserved) |
+| `InboundSenderRemoved` | `channel`, `id`, `group`, `removed_by` | (none here; reserved) |
+| `ApproverAdded`        | `adapter_id`, `user_id`, `display_name`, `added_by` | (none here; reserved) |
+| `ApproverRemoved`      | `adapter_id`, `user_id`, `removed_by` | (none here; reserved) |
+| `ApprovalChatSet`      | `adapter_id`, `previous_conversation_id?`, `conversation_id`, `set_by` | (none here; reserved) |
+| `OperatorCommandRefused` | `command`, `invocation`, `reason` (`inside_exec`) | (none here; reserved) |
+| `UpdateRefused`        | `invocation` (`check` / `install` / `rollback`), `reason` (`inside_exec` / `vault_format`) | (none here; reserved) |
+| `McpCredentialRefreshDiscarded` | `credential`, `reason` (`removed` / `reauthorized` / `unreadable`) | (none here; reserved) |
+| `CredentialDestinationRefused` | `credential`, `destination_kind` (`host` / `mcp_server` / `provider` / `adapter` / `plan`), `destination`, `named_by` | (none here; reserved) |
+| `CredentialDestinationGranted` | `credential`, `destination_kind`, `destination`, `granted_by` | (none here; reserved) |
+| `CredentialDestinationRevoked` | `credential`, `destination_kind`, `destination`, `revoked_by` | (none here; reserved) |
+| `CredentialHandedOut`  | `credential`, `destination_kind`, `destination` | (none here; reserved) |
+| `VaultMigrated`        | `rows`, `from_format`, `to_format`, `backup` | (none here; reserved) |
 
 `SandboxEgressVerdict` is emitted for every request the proxy decides, allow included, not only refusals. An allow row carries the same `sensitivity_basis`, which is what lets a detection assert that a connection was permitted after a given set of reads rather than seeing only what was turned away. Expect one row per proxied CONNECT.
 
@@ -347,6 +394,19 @@ however that build was installed. The `gateway.start` legacy row
 carries the same `{version, commit, dirty}` in its detail from 2.3.0;
 before, its detail was null. `commit` is a short hash or `unknown`;
 `dirty` is `clean`, `dirty` or `unknown`.
+
+Every variant added in 3.0.0 is forwarded by default, with no agent,
+adapter or sender column except `InboundSenderRefused`, which carries
+the adapter and the refused sender. They are written outside any
+session, on `gateway-inbound` (`InboundSenderRefused`),
+`gateway-senders`, `gateway-approvers` (the allowlist changes and
+`OperatorCommandRefused`), `gateway-install` (`UpdateRefused`),
+`gateway-mcp-credentials` (`McpCredentialRefreshDiscarded`) and
+`gateway-credentials` (the credential destination rows and
+`VaultMigrated`). `CredentialDestinationRefused` is `error`;
+`InboundSenderRefused`, `OperatorCommandRefused` and
+`McpCredentialRefreshDiscarded` are `warn`. A credential row names the
+credential and never its value.
 
 `connection.panic` (2.0.0) is a legacy row for a connection task that
 panicked: target the adapter id, or the connection kind when there is

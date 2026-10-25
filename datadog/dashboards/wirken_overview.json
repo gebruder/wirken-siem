@@ -153,7 +153,7 @@
     {
       "definition": {
         "type": "timeseries",
-        "title": "Veto hook deny or timeout (Detection 7)",
+        "title": "Veto hook deny, timeout or unavailable (Detection 7)",
         "requests": [
           {
             "response_format": "timeseries",
@@ -164,7 +164,7 @@
                 "indexes": ["main"],
                 "compute": {"aggregation": "count"},
                 "search": {
-                  "query": "@ddsource:wirken @wirken.kind:hook_dispatched (@wirken.event.decision.kind:deny OR @wirken.event.decision.kind:timeout)"
+                  "query": "@ddsource:wirken @wirken.kind:hook_dispatched (@wirken.event.decision.kind:deny OR @wirken.event.decision.kind:timeout OR @wirken.event.decision.kind:unavailable)"
                 }
               }
             ],
