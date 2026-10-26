@@ -16,6 +16,7 @@ binary.
 | 0.4         | 1.3.x – 2.3.x       |
 | 0.4.1       | 1.3.x – 2.3.x       |
 | 0.5         | 1.3.x – 3.0.x       |
+| 0.6         | 1.3.x – 3.1.x       |
 
 wirken-siem 0.1 shipped detections 1-8 against audit schema 1.3.x
 through 1.8.x. 0.2 adds detections 9 (per-agent cost anomaly) and 10
@@ -35,7 +36,8 @@ Splunk detection, 1 to 13, is checked against rows posted to HEC in
 the forwarder's own shape. 0.5 extends support through 3.0.x and has
 detection 7 fire on `unavailable` too: from 3.0.0 a registered veto
 hook that is not connected refuses the call with that decision.
-Detections 1-6 and 8-13 fire unmodified.
+Detections 1-6 and 8-13 fire unmodified. 0.6 extends support through
+3.1.x; detections 1-13 fire unmodified.
 
 Audit-schema changes in the 2.x and 3.x series, one row per minor that
 changed something. 2.1.0, 2.4.x and 2.5.x changed the audit schema not
@@ -46,9 +48,10 @@ at all.
 | 2.0.x  | Twelve typed variants: `llm_request_failed`; the adapter lifecycle events `adapter_connect`, `adapter_disconnect`, `adapter_restart` and `adapter_restart_abandoned`; the MCP server lifecycle events `mcp_server_sandboxed`, `mcp_server_unsandboxed`, `mcp_server_exited`, `mcp_server_restart` and `mcp_server_restart_abandoned`; `mcp_credential_refetched`; and `leak_refused`. `mcp_server` on `SandboxEgressVerdict`. A level on every typed row. The `connection.panic` legacy action. Sequence numbers are never reused after a rewind. No 2.x binary writes the `wasm_skill_call` `Action` label. |
 | 2.2.x  | `request_bytes` and `purpose` on `LlmRequest`. Compaction summary and tool-call probe model calls are recorded as `llm_request` / `llm_response` pairs. |
 | 2.3.x  | The `binary_installed` typed variant. `build` on the `SessionStart` chain head. A `{version, commit, dirty}` detail on the `gateway.start` legacy row. |
+| 3.1.x  | Four typed variants: `read_sensitivity_observed`, `read_sensitivity_exempted`, `operator_command` and `authority_reloaded`. The cause `credential_changed` on `AdapterRestart` and `McpServerRestart`. Every actor field a `wirken` command writes, `added_by`, `removed_by`, `granted_by`, `revoked_by`, `set_by`, `run_by`, the `approved_by` and `denied_by` of a decision made with `wirken permissions pending`, and an import's `actor`, names the OS account the command ran as, `uid:<n> (<name>)` or `uid:<n>`, `sid:<SID>` on Windows, where it held the login name from `$USER`. |
 | 3.0.x  | Fourteen typed variants: `inbound_sender_refused`, `inbound_sender_added`, `inbound_sender_removed`, `approver_added`, `approver_removed`, `approval_chat_set`, `operator_command_refused`, `update_refused`, `mcp_credential_refresh_discarded`, `credential_destination_refused`, `credential_destination_granted`, `credential_destination_revoked`, `credential_handed_out` and `vault_migrated`. `approved_by` on `PermissionApproved` now holds the verified identity of the approver; the display name moves to `approver_display`. `denied_by` and `denier_display` on `PermissionDenied`. `channel` on `PermissionApproved`, `PermissionRenewed`, `PermissionRevoked`, `PermissionGrantExpired` and `PermissionGrantPruned`. `unavailable` in `HookDispatched` and `EgressHookDispatched` decisions. The Sentinel `DecidedBy` column. |
 
-Every audit-schema change from 1.4.0 through 3.0.0 has been
+Every audit-schema change from 1.4.0 through 3.1.0 has been
 forward-compatible (`#[serde(default)]` on new fields, new variants
 sitting alongside existing ones): 1.8.0 added a `wasm_skill_call`
 value to the `Action` label vocabulary (it rides the existing
@@ -299,7 +302,7 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `ExecLocationDisagreement` | `agent_id`, `adapter_id?`, `sender_id?`, `verified_session_id`, `approval_seq`, `result_seq`, `told.{mode,text}`, `ran.{mode,runtime,container_id?}` | 11 |
 | `AdapterConnect`       | `adapter_id`, `channel`, `pubkey_fingerprint` | (none here; reserved) |
 | `AdapterDisconnect`    | `adapter_id`, `channel`, `pubkey_fingerprint`, `reason` (`ended` / `panic`) | (none here; reserved) |
-| `AdapterRestart`       | `adapter_id`, `channel`, `attempt`, `cause` (`process_exited` / `connection_ended` / `connection_panicked` / `spawn_failed`), `exit`, `delay_ms`, `connected_for_ms?` | (none here; reserved) |
+| `AdapterRestart`       | `adapter_id`, `channel`, `attempt`, `cause` (`process_exited` / `connection_ended` / `connection_panicked` / `spawn_failed` / `credential_changed`), `exit`, `delay_ms`, `connected_for_ms?` | (none here; reserved) |
 | `AdapterRestartAbandoned` | `adapter_id`, `channel`, `attempts`, `last_cause`, `last_exit` | (none here; reserved) |
 | `LlmRequest`           | `agent_id`, `credential_id?`, `sender_id?`, `request_id`, `provider`, `model`, `messages_hash`, `tools_hash`, `tools_hash_version`, `request_bytes?`, `purpose?` (`compaction_summary` / `tool_call_probe`; absent for a turn) | (none here; reserved) |
 | `LlmRequestFailed`     | `agent_id`, `credential_id?`, `sender_id?`, `request_id`, `error`, `latency_ms` | (none here; reserved) |
@@ -307,7 +310,7 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `McpServerSandboxed`   | `agent_id`, `server_name`, `container_id`, `image`, `image_id?`, `image_digest?`, `runtime` (`docker` / `gvisor` / `host`), `memory_bytes`, `nano_cpus`, `pids`, `mounts[]`, `egress_hosts[]`, `secrets_as_files[]`, `secrets_in_env[]` | (none here; reserved) |
 | `McpServerUnsandboxed` | `agent_id`, `server_name` | (none here; reserved) |
 | `McpServerExited`      | `agent_id`, `server_name`, `container_id`, `exit_code?`, `stopped_by_proxy` | (none here; reserved) |
-| `McpServerRestart`     | `agent_id`, `server_name`, `attempt`, `cause` (`exited` / `start_failed` / `initialize_failed`), `detail`, `delay_ms`, `ran_for_ms?` | (none here; reserved) |
+| `McpServerRestart`     | `agent_id`, `server_name`, `attempt`, `cause` (`exited` / `start_failed` / `initialize_failed` / `credential_changed`), `detail`, `delay_ms`, `ran_for_ms?` | (none here; reserved) |
 | `McpServerRestartAbandoned` | `agent_id`, `server_name`, `attempts`, `last_cause`, `last_detail` | (none here; reserved) |
 | `McpCredentialRefetched` | `credential` | (none here; reserved) |
 | `ChainHead`            | `reason` (`session_start` / `session_end` / `checkpoint` / `rotation` / `redaction`), `sequence_range_start`, `sequence_range_end`, `signing_pubkey`, `build?` (`{version, commit, dirty}`, only when `reason` is `session_start`) | (none here; reserved) |
@@ -327,6 +330,10 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `CredentialDestinationRevoked` | `credential`, `destination_kind`, `destination`, `revoked_by` | (none here; reserved) |
 | `CredentialHandedOut`  | `credential`, `destination_kind`, `destination` | (none here; reserved) |
 | `VaultMigrated`        | `rows`, `from_format`, `to_format`, `backup` | (none here; reserved) |
+| `ReadSensitivityObserved` | `sensitivity` (`workspace` / `channel_memory` / `cross_channel_memory` / `imported_archive` / `aggregated_external` / `exec_output` / `mcp_output` / `credentialed_response`), `tool` | (none here; reserved) |
+| `ReadSensitivityExempted` | `exempted[]` (`exec_output` / `mcp_output`), `still_escalated` | (none here; reserved) |
+| `OperatorCommand`      | `command`, `target`, `detail?`, `run_by` | (none here; reserved) |
+| `AuthorityReloaded`    | `subject_kind` (`credential` / `adapter` / `hook`), `subject`, `change` (`rotated` / `rebound` / `removed` / `added` / `rekeyed`), `reloaded[]` | (none here; reserved) |
 
 `SandboxEgressVerdict` is emitted for every request the proxy decides, allow included, not only refusals. An allow row carries the same `sensitivity_basis`, which is what lets a detection assert that a connection was permitted after a given set of reads rather than seeing only what was turned away. Expect one row per proxied CONNECT.
 
@@ -407,6 +414,25 @@ session, on `gateway-inbound` (`InboundSenderRefused`),
 `InboundSenderRefused`, `OperatorCommandRefused` and
 `McpCredentialRefreshDiscarded` are `warn`. A credential row names the
 credential and never its value.
+
+Every variant added in 3.1.0 is forwarded by default at `info`, with no
+agent, adapter or sender column. `ReadSensitivityObserved` is written on
+the session that read: once per label, the first time, so a session's
+rows list what escalates its later `http_request` calls.
+`ReadSensitivityExempted` is on the same session, once per turn where an
+agent's `exempt_exec_mcp_output` setting left `exec_output` or
+`mcp_output` out of that escalation; `still_escalated` is whether other
+labels sent the call to the operator anyway. `OperatorCommand` is on
+`gateway-operator`, one row per `wirken` command that changed what the
+gateway trusts or runs, sealed by a chain head; `detail` never holds a
+secret. `AuthorityReloaded` is on `gateway-reloads`, one row per change
+the running gateway took up without a restart. An `AdapterRestart` or
+`McpServerRestart` with cause `credential_changed` is `info`, with no
+delay: it was asked for, not a failure.
+
+A query that matched a CLI actor field against a login name, such as
+`added_by="davi"`, matches nothing from 3.1.0 on: the field holds
+`uid:1000 (davi)`. Match the uid, or the name in parentheses.
 
 `connection.panic` (2.0.0) is a legacy row for a connection task that
 panicked: target the adapter id, or the connection kind when there is
