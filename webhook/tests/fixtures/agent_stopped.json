@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-10-28T00:00:00Z",
+  "session_id": "gateway-operator",
+  "seq": 9,
+  "kind": "agent_stopped",
+  "trust": "user",
+  "level": "warn",
+  "event": {
+    "kind": "agent_stopped",
+    "agent_id": "default",
+    "stopped_by": "uid:1000 (operator)",
+    "grants_revoked": 0,
+    "session_grants_cleared": 1
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

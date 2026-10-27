@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-10-28T00:00:00Z",
+  "session_id": "gateway-operator",
+  "seq": 9,
+  "kind": "agent_resumed",
+  "trust": "user",
+  "level": "info",
+  "event": {
+    "kind": "agent_resumed",
+    "agent_id": "default",
+    "resumed_by": "uid:1000 (operator)"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

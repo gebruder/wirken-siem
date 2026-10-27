@@ -354,7 +354,12 @@ def test_evaluate_empty_when_no_detection_applies():
 
 @pytest.mark.parametrize(
     "fixture",
-    ["session_liveness_unavailable.json", "operator_command_refused_permissions.json"],
+    [
+        "session_liveness_unavailable.json",
+        "operator_command_refused_permissions.json",
+        "agent_stopped.json",
+        "agent_resumed.json",
+    ],
 )
 def test_evaluate_passes_rows_no_detection_reads(fixture):
     assert rules.evaluate(load_fixture(fixture), []) == []
