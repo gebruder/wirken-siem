@@ -48,6 +48,7 @@ at all.
 | 2.0.x  | Twelve typed variants: `llm_request_failed`; the adapter lifecycle events `adapter_connect`, `adapter_disconnect`, `adapter_restart` and `adapter_restart_abandoned`; the MCP server lifecycle events `mcp_server_sandboxed`, `mcp_server_unsandboxed`, `mcp_server_exited`, `mcp_server_restart` and `mcp_server_restart_abandoned`; `mcp_credential_refetched`; and `leak_refused`. `mcp_server` on `SandboxEgressVerdict`. A level on every typed row. The `connection.panic` legacy action. Sequence numbers are never reused after a rewind. No 2.x binary writes the `wasm_skill_call` `Action` label. |
 | 2.2.x  | `request_bytes` and `purpose` on `LlmRequest`. Compaction summary and tool-call probe model calls are recorded as `llm_request` / `llm_response` pairs. |
 | 2.3.x  | The `binary_installed` typed variant. `build` on the `SessionStart` chain head. A `{version, commit, dirty}` detail on the `gateway.start` legacy row. |
+| main after 3.1.0 (unreleased) | The `session_liveness_unavailable` typed variant. `operator_command_refused` written on `gateway-operator` for the authority-changing subcommands of sixteen `wirken` commands. |
 | 3.1.x  | Four typed variants: `read_sensitivity_observed`, `read_sensitivity_exempted`, `operator_command` and `authority_reloaded`. The cause `credential_changed` on `AdapterRestart` and `McpServerRestart`. Every actor field a `wirken` command writes, `added_by`, `removed_by`, `granted_by`, `revoked_by`, `set_by`, `run_by`, the `approved_by` and `denied_by` of a decision made with `wirken permissions pending`, and an import's `actor`, names the OS account the command ran as, `uid:<n> (<name>)` or `uid:<n>`, `sid:<SID>` on Windows, where it held the login name from `$USER`. |
 | 3.0.x  | Fourteen typed variants: `inbound_sender_refused`, `inbound_sender_added`, `inbound_sender_removed`, `approver_added`, `approver_removed`, `approval_chat_set`, `operator_command_refused`, `update_refused`, `mcp_credential_refresh_discarded`, `credential_destination_refused`, `credential_destination_granted`, `credential_destination_revoked`, `credential_handed_out` and `vault_migrated`. `approved_by` on `PermissionApproved` now holds the verified identity of the approver; the display name moves to `approver_display`. `denied_by` and `denier_display` on `PermissionDenied`. `channel` on `PermissionApproved`, `PermissionRenewed`, `PermissionRevoked`, `PermissionGrantExpired` and `PermissionGrantPruned`. `unavailable` in `HookDispatched` and `EgressHookDispatched` decisions. The Sentinel `DecidedBy` column. |
 
@@ -149,7 +150,12 @@ consume `McpEntryRefused`, `HookDispatched`, and
 - `ApproverAdded`, `ApproverRemoved`, `ApprovalChatSet` (3.0.0, the
   operator's changes to who may approve and where prompts post)
 - `OperatorCommandRefused` (3.0.0, `wirken senders` or `wirken
-  approvers` refused inside a Wirken `exec`)
+  approvers` refused inside a Wirken `exec`; on Wirken main after
+  3.1.0, also every `wirken` subcommand that changes authority or
+  configuration)
+- `SessionLivenessUnavailable` (Wirken main after 3.1.0, `wirken run`
+  could not open the session store it asks about liveness, so no
+  session-scoped grant is served until it restarts)
 - `UpdateRefused` (3.0.0, `wirken update` refused inside a Wirken
   `exec`, or a rollback a migrated vault would break)
 - `McpCredentialRefreshDiscarded` (3.0.0, a refreshed OAuth credential
@@ -322,7 +328,8 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `ApproverAdded`        | `adapter_id`, `user_id`, `display_name`, `added_by` | (none here; reserved) |
 | `ApproverRemoved`      | `adapter_id`, `user_id`, `removed_by` | (none here; reserved) |
 | `ApprovalChatSet`      | `adapter_id`, `previous_conversation_id?`, `conversation_id`, `set_by` | (none here; reserved) |
-| `OperatorCommandRefused` | `command`, `invocation`, `reason` (`inside_exec`) | (none here; reserved) |
+| `OperatorCommandRefused` | `command` (`senders` / `approvers`; on main after 3.1.0 also `permissions` / `skills` / `mcp` / `credentials` / `vault` / `audit` / `agents` / `channel` / `cron` / `hooks` / `persona` / `preset` / `webchat` / `zirkel` / `setup` / `import`), `invocation` (the subcommand; empty for `setup` and `import`), `reason` (`inside_exec`) | (none here; reserved) |
+| `SessionLivenessUnavailable` | `error` | (none here; reserved) |
 | `UpdateRefused`        | `invocation` (`check` / `install` / `rollback`), `reason` (`inside_exec` / `vault_format`) | (none here; reserved) |
 | `McpCredentialRefreshDiscarded` | `credential`, `reason` (`removed` / `reauthorized` / `unreadable`) | (none here; reserved) |
 | `CredentialDestinationRefused` | `credential`, `destination_kind` (`host` / `mcp_server` / `provider` / `adapter` / `plan`), `destination`, `named_by` | (none here; reserved) |
@@ -429,6 +436,16 @@ secret. `AuthorityReloaded` is on `gateway-reloads`, one row per change
 the running gateway took up without a restart. An `AdapterRestart` or
 `McpServerRestart` with cause `credential_changed` is `info`, with no
 delay: it was asked for, not a failure.
+
+On Wirken main after 3.1.0, not yet released: `SessionLivenessUnavailable`
+is on `gateway-permissions`, sealed by a chain head, forwarded by default
+at `warn`, with `error` and no agent, adapter or sender column.
+`OperatorCommandRefused` is also written on `gateway-operator`, sealed by
+a chain head, for each refused subcommand of `permissions`, `skills`,
+`mcp`, `credentials`, `vault`, `audit`, `agents`, `channel`, `cron`,
+`hooks`, `persona`, `preset`, `webchat` and `zirkel`, and for `setup` and
+`import`, whose `invocation` is empty. No detection keys on `command`, so
+detections 1-13 fire unmodified on both.
 
 A query that matched a CLI actor field against a login name, such as
 `added_by="davi"`, matches nothing from 3.1.0 on: the field holds

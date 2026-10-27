@@ -352,6 +352,14 @@ def test_evaluate_empty_when_no_detection_applies():
     assert rules.evaluate(ev, []) == []
 
 
+@pytest.mark.parametrize(
+    "fixture",
+    ["session_liveness_unavailable.json", "operator_command_refused_permissions.json"],
+)
+def test_evaluate_passes_rows_no_detection_reads(fixture):
+    assert rules.evaluate(load_fixture(fixture), []) == []
+
+
 def test_evaluate_routes_mcp_entry_refused_through_composition():
     ev = load_fixture("mcp_entry_refused.json")
     matches = rules.evaluate(ev, [])

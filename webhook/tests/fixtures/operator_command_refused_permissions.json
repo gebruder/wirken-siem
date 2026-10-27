@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-10-27T12:00:00Z",
+  "session_id": "gateway-operator",
+  "seq": 7,
+  "kind": "operator_command_refused",
+  "trust": "user",
+  "level": "warn",
+  "event": {
+    "kind": "operator_command_refused",
+    "command": "permissions",
+    "invocation": "approve",
+    "reason": "inside_exec"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

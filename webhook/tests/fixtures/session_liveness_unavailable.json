@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-10-27T12:00:00Z",
+  "session_id": "gateway-permissions",
+  "seq": 3,
+  "kind": "session_liveness_unavailable",
+  "trust": "system",
+  "level": "warn",
+  "event": {
+    "kind": "session_liveness_unavailable",
+    "error": "unable to open database file"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}
