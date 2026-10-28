@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-10-28T00:00:00Z",
+  "session_id": "default/webchat/c-1",
+  "seq": 17,
+  "kind": "permission_denied",
+  "trust": "system",
+  "level": "info",
+  "event": {
+    "kind": "permission_denied",
+    "tool": "exec",
+    "action_key": "shell:sleep",
+    "denial_source": "tier",
+    "tier": "tier3",
+    "agent_id": "default",
+    "trigger": "run sleep",
+    "denial_reason": "gateway stopped"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

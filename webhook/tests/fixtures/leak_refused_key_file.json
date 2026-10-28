@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-10-28T00:00:00Z",
+  "session_id": "default/webchat/c-1",
+  "seq": 9,
+  "kind": "leak_refused",
+  "trust": "system",
+  "level": "error",
+  "event": {
+    "kind": "leak_refused",
+    "credential": "agents/default/identity.key",
+    "surface": "tool_output",
+    "agent_id": "default",
+    "channel": "webchat",
+    "tool_name": "exec"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-10-28T00:00:00+00:00",
+  "actor_kind": "service",
+  "actor_id": "gateway",
+  "action": "message.inbound_dropped",
+  "target": "telegram",
+  "channel": "telegram",
+  "session": null,
+  "detail": {
+    "count": 2,
+    "reason": "gateway_stopped"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

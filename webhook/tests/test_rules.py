@@ -359,6 +359,9 @@ def test_evaluate_empty_when_no_detection_applies():
         "operator_command_refused_permissions.json",
         "agent_stopped.json",
         "agent_resumed.json",
+        "audit_legacy_message_inbound_dropped.json",
+        "permission_denied_gateway_stopped.json",
+        "leak_refused_key_file.json",
     ],
 )
 def test_evaluate_passes_rows_no_detection_reads(fixture):

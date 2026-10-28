@@ -17,6 +17,7 @@ binary.
 | 0.4.1       | 1.3.x – 2.3.x       |
 | 0.5         | 1.3.x – 3.0.x       |
 | 0.6         | 1.3.x – 3.1.x       |
+| 0.7         | 1.3.x – 3.2.x       |
 
 wirken-siem 0.1 shipped detections 1-8 against audit schema 1.3.x
 through 1.8.x. 0.2 adds detections 9 (per-agent cost anomaly) and 10
@@ -37,7 +38,8 @@ the forwarder's own shape. 0.5 extends support through 3.0.x and has
 detection 7 fire on `unavailable` too: from 3.0.0 a registered veto
 hook that is not connected refuses the call with that decision.
 Detections 1-6 and 8-13 fire unmodified. 0.6 extends support through
-3.1.x; detections 1-13 fire unmodified.
+3.1.x; detections 1-13 fire unmodified. 0.7 extends support through
+3.2.x; detections 1-13 fire unmodified.
 
 Audit-schema changes in the 2.x and 3.x series, one row per minor that
 changed something. 2.1.0, 2.4.x and 2.5.x changed the audit schema not
@@ -48,7 +50,7 @@ at all.
 | 2.0.x  | Twelve typed variants: `llm_request_failed`; the adapter lifecycle events `adapter_connect`, `adapter_disconnect`, `adapter_restart` and `adapter_restart_abandoned`; the MCP server lifecycle events `mcp_server_sandboxed`, `mcp_server_unsandboxed`, `mcp_server_exited`, `mcp_server_restart` and `mcp_server_restart_abandoned`; `mcp_credential_refetched`; and `leak_refused`. `mcp_server` on `SandboxEgressVerdict`. A level on every typed row. The `connection.panic` legacy action. Sequence numbers are never reused after a rewind. No 2.x binary writes the `wasm_skill_call` `Action` label. |
 | 2.2.x  | `request_bytes` and `purpose` on `LlmRequest`. Compaction summary and tool-call probe model calls are recorded as `llm_request` / `llm_response` pairs. |
 | 2.3.x  | The `binary_installed` typed variant. `build` on the `SessionStart` chain head. A `{version, commit, dirty}` detail on the `gateway.start` legacy row. |
-| main after 3.1.0 (unreleased) | The `session_liveness_unavailable` typed variant. `operator_command_refused` written on `gateway-operator` for the authority-changing subcommands of sixteen `wirken` commands. The `agent_stopped` and `agent_resumed` typed variants. `agent stopped` as a `denial_reason` on `PermissionDenied`. The `message.refused` and `cron.skipped` legacy actions. |
+| 3.2.x  | Three typed variants: `session_liveness_unavailable`, `agent_stopped` and `agent_resumed`. `operator_command_refused` on `gateway-operator` for the authority-changing subcommands of sixteen `wirken` commands, with an empty `invocation` for `setup` and `import`. The `denial_reason` values `agent stopped`, `gateway stopped` and `no terminal for approval` on `PermissionDenied`. The `reason` `agent_stopped` on `SessionScopedApprovalsCleared`. `credential` on `LeakRefused` can name a key file by its path under the data directory. The legacy actions `message.refused`, `cron.skipped` and `message.inbound_dropped`. |
 | 3.1.x  | Four typed variants: `read_sensitivity_observed`, `read_sensitivity_exempted`, `operator_command` and `authority_reloaded`. The cause `credential_changed` on `AdapterRestart` and `McpServerRestart`. Every actor field a `wirken` command writes, `added_by`, `removed_by`, `granted_by`, `revoked_by`, `set_by`, `run_by`, the `approved_by` and `denied_by` of a decision made with `wirken permissions pending`, and an import's `actor`, names the OS account the command ran as, `uid:<n> (<name>)` or `uid:<n>`, `sid:<SID>` on Windows, where it held the login name from `$USER`. |
 | 3.0.x  | Fourteen typed variants: `inbound_sender_refused`, `inbound_sender_added`, `inbound_sender_removed`, `approver_added`, `approver_removed`, `approval_chat_set`, `operator_command_refused`, `update_refused`, `mcp_credential_refresh_discarded`, `credential_destination_refused`, `credential_destination_granted`, `credential_destination_revoked`, `credential_handed_out` and `vault_migrated`. `approved_by` on `PermissionApproved` now holds the verified identity of the approver; the display name moves to `approver_display`. `denied_by` and `denier_display` on `PermissionDenied`. `channel` on `PermissionApproved`, `PermissionRenewed`, `PermissionRevoked`, `PermissionGrantExpired` and `PermissionGrantPruned`. `unavailable` in `HookDispatched` and `EgressHookDispatched` decisions. The Sentinel `DecidedBy` column. |
 
@@ -109,7 +111,9 @@ consume `McpEntryRefused`, `HookDispatched`, and
 - `McpEntryVerified`, `McpEntryRefused` (mcp.json signature anchor)
 - `PhaseEntered`, `PhaseExited`, `SkillPermissionDenied`
   (per-skill phase deny overlay)
-- `SessionScopedApprovalsCleared` (session-scoped approval lifecycle)
+- `SessionScopedApprovalsCleared` (session-scoped approval lifecycle;
+  `reason` is `session_ended`, or from 3.2.0 `agent_stopped` for the
+  tombstones `wirken agents stop` writes)
 - `ChainHead` (gateway-keyed signature over chain ranges)
 - `Compaction` (context-engine compaction extracts)
 - `SandboxEgressVerdict` (1.16.0, one row per sandbox egress request,
@@ -150,12 +154,11 @@ consume `McpEntryRefused`, `HookDispatched`, and
 - `ApproverAdded`, `ApproverRemoved`, `ApprovalChatSet` (3.0.0, the
   operator's changes to who may approve and where prompts post)
 - `OperatorCommandRefused` (3.0.0, `wirken senders` or `wirken
-  approvers` refused inside a Wirken `exec`; on Wirken main after
-  3.1.0, also every `wirken` subcommand that changes authority or
-  configuration)
-- `AgentStopped`, `AgentResumed` (Wirken main after 3.1.0, `wirken agents
-  stop` and `wirken agents resume`)
-- `SessionLivenessUnavailable` (Wirken main after 3.1.0, `wirken run`
+  approvers` refused inside a Wirken `exec`; from 3.2.0, also every
+  `wirken` subcommand that changes authority or configuration)
+- `AgentStopped`, `AgentResumed` (3.2.0, `wirken agents stop` and
+  `wirken agents resume`)
+- `SessionLivenessUnavailable` (3.2.0, `wirken run`
   could not open the session store it asks about liveness, so no
   session-scoped grant is served until it restarts)
 - `UpdateRefused` (3.0.0, `wirken update` refused inside a Wirken
@@ -314,7 +317,7 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `AdapterRestartAbandoned` | `adapter_id`, `channel`, `attempts`, `last_cause`, `last_exit` | (none here; reserved) |
 | `LlmRequest`           | `agent_id`, `credential_id?`, `sender_id?`, `request_id`, `provider`, `model`, `messages_hash`, `tools_hash`, `tools_hash_version`, `request_bytes?`, `purpose?` (`compaction_summary` / `tool_call_probe`; absent for a turn) | (none here; reserved) |
 | `LlmRequestFailed`     | `agent_id`, `credential_id?`, `sender_id?`, `request_id`, `error`, `latency_ms` | (none here; reserved) |
-| `LeakRefused`          | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `credential`, `surface` (`tool_output` / `tool_arguments` / `provider_request` / `reply` / `user_message` / `skill_load`), `tool_name?`, `server_name?`, `skill_name?` | (none here; reserved) |
+| `LeakRefused`          | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `credential` (a vault entry name, or from 3.2.0 a key file's path under the data directory: `agents/<id>/identity.key`, `audit/audit-signing.key`, `operator/operator.key`), `surface` (`tool_output` / `tool_arguments` / `provider_request` / `reply` / `user_message` / `skill_load`), `tool_name?`, `server_name?`, `skill_name?` | (none here; reserved) |
 | `McpServerSandboxed`   | `agent_id`, `server_name`, `container_id`, `image`, `image_id?`, `image_digest?`, `runtime` (`docker` / `gvisor` / `host`), `memory_bytes`, `nano_cpus`, `pids`, `mounts[]`, `egress_hosts[]`, `secrets_as_files[]`, `secrets_in_env[]` | (none here; reserved) |
 | `McpServerUnsandboxed` | `agent_id`, `server_name` | (none here; reserved) |
 | `McpServerExited`      | `agent_id`, `server_name`, `container_id`, `exit_code?`, `stopped_by_proxy` | (none here; reserved) |
@@ -330,7 +333,7 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `ApproverAdded`        | `adapter_id`, `user_id`, `display_name`, `added_by` | (none here; reserved) |
 | `ApproverRemoved`      | `adapter_id`, `user_id`, `removed_by` | (none here; reserved) |
 | `ApprovalChatSet`      | `adapter_id`, `previous_conversation_id?`, `conversation_id`, `set_by` | (none here; reserved) |
-| `OperatorCommandRefused` | `command` (`senders` / `approvers`; on main after 3.1.0 also `permissions` / `skills` / `mcp` / `credentials` / `vault` / `audit` / `agents` / `channel` / `cron` / `hooks` / `persona` / `preset` / `webchat` / `zirkel` / `setup` / `import`), `invocation` (the subcommand; empty for `setup` and `import`), `reason` (`inside_exec`) | (none here; reserved) |
+| `OperatorCommandRefused` | `command` (`senders` / `approvers`; from 3.2.0 also `permissions` / `skills` / `mcp` / `credentials` / `vault` / `audit` / `agents` / `channel` / `cron` / `hooks` / `persona` / `preset` / `webchat` / `zirkel` / `setup` / `import`), `invocation` (the subcommand; empty for `setup` and `import`), `reason` (`inside_exec`) | (none here; reserved) |
 | `SessionLivenessUnavailable` | `error` | (none here; reserved) |
 | `AgentStopped`         | `agent_id`, `stopped_by`, `grants_revoked`, `session_grants_cleared` | (none here; reserved) |
 | `AgentResumed`         | `agent_id`, `resumed_by` | (none here; reserved) |
@@ -441,7 +444,7 @@ the running gateway took up without a restart. An `AdapterRestart` or
 `McpServerRestart` with cause `credential_changed` is `info`, with no
 delay: it was asked for, not a failure.
 
-On Wirken main after 3.1.0, not yet released: `SessionLivenessUnavailable`
+From 3.2.0: `SessionLivenessUnavailable`
 is on `gateway-permissions`, sealed by a chain head, forwarded by default
 at `warn`, with `error` and no agent, adapter or sender column.
 `OperatorCommandRefused` is also written on `gateway-operator`, sealed by
@@ -451,15 +454,22 @@ a chain head, for each refused subcommand of `permissions`, `skills`,
 `import`, whose `invocation` is empty. No detection keys on `command`, so
 detections 1-13 fire unmodified on both.
 
-Also on main after 3.1.0: `AgentStopped` and `AgentResumed` are on
+Also from 3.2.0: `AgentStopped` and `AgentResumed` are on
 `gateway-operator`, one row per `wirken agents stop` or `resume`, sealed by
 a chain head, forwarded by default, `AgentStopped` at `warn` and
 `AgentResumed` at `info`, with the agent column set and no adapter or
 sender. A pending approval a stop denies is a `PermissionDenied` with
-`denial_reason` `agent stopped`. A message to a stopped agent is a
+`denial_reason` `agent stopped`; one a clean gateway stop drops carries
+`gateway stopped`, and one a `wirken lyrik run` with no terminal refuses
+carries `no terminal for approval`. A message to a stopped agent is a
 `message.refused` legacy row, and a cron firing for one a `cron.skipped`
 legacy row targeting the job id, each with detail `{reason:
-"agent_stopped", agent_id}`. Detections 1-13 fire unmodified.
+"agent_stopped", agent_id}`. Messages a connection had read and not yet
+handled when the gateway stopped are one `message.inbound_dropped` legacy
+row per connection, targeting the adapter id, with detail `{count,
+reason}` (`gateway_stopped` or `connection_ended`) and no sender or
+content. `LeakRefused` names a matched key file by its path under the data
+directory. Detections 1-13 fire unmodified.
 
 A query that matched a CLI actor field against a login name, such as
 `added_by="davi"`, matches nothing from 3.1.0 on: the field holds
