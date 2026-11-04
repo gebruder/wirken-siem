@@ -50,7 +50,7 @@ at all.
 | 2.0.x  | Twelve typed variants: `llm_request_failed`; the adapter lifecycle events `adapter_connect`, `adapter_disconnect`, `adapter_restart` and `adapter_restart_abandoned`; the MCP server lifecycle events `mcp_server_sandboxed`, `mcp_server_unsandboxed`, `mcp_server_exited`, `mcp_server_restart` and `mcp_server_restart_abandoned`; `mcp_credential_refetched`; and `leak_refused`. `mcp_server` on `SandboxEgressVerdict`. A level on every typed row. The `connection.panic` legacy action. Sequence numbers are never reused after a rewind. No 2.x binary writes the `wasm_skill_call` `Action` label. |
 | 2.2.x  | `request_bytes` and `purpose` on `LlmRequest`. Compaction summary and tool-call probe model calls are recorded as `llm_request` / `llm_response` pairs. |
 | 2.3.x  | The `binary_installed` typed variant. `build` on the `SessionStart` chain head. A `{version, commit, dirty}` detail on the `gateway.start` legacy row. |
-| 3.2.x  | Three typed variants: `session_liveness_unavailable`, `agent_stopped` and `agent_resumed`. `operator_command_refused` on `gateway-operator` for the authority-changing subcommands of sixteen `wirken` commands, with an empty `invocation` for `setup` and `import`. The `denial_reason` values `agent stopped`, `gateway stopped` and `no terminal for approval` on `PermissionDenied`. The `reason` `agent_stopped` on `SessionScopedApprovalsCleared`. `credential` on `LeakRefused` can name a key file by its path under the data directory. The legacy actions `message.refused`, `cron.skipped` and `message.inbound_dropped`. |
+| 3.2.x  | Three typed variants: `session_liveness_unavailable`, `agent_stopped` and `agent_resumed`. `operator_command_refused` on `gateway-operator` for the authority-changing subcommands of sixteen `wirken` commands, with an empty `invocation` for `setup` and `import`. The `denial_reason` values `agent stopped`, `gateway stopped` and `no terminal for approval` on `PermissionDenied`. The `reason` `agent_stopped` on `SessionScopedApprovalsCleared`. `credential` on `LeakRefused` can name a key file by its path under the data directory. The legacy actions `message.refused`, `cron.skipped` and `message.inbound_dropped`. From 3.2.1: `method` and `host` on `SkillPermissionDenied` for an `http_request` refusal; `method` and the `reason` `record_failed` on `SandboxEgressVerdict`; the legacy action `audit.writer_halted`, at level `error`, closing the forward-only drain of a write-failure halt. |
 | 3.1.x  | Four typed variants: `read_sensitivity_observed`, `read_sensitivity_exempted`, `operator_command` and `authority_reloaded`. The cause `credential_changed` on `AdapterRestart` and `McpServerRestart`. Every actor field a `wirken` command writes, `added_by`, `removed_by`, `granted_by`, `revoked_by`, `set_by`, `run_by`, the `approved_by` and `denied_by` of a decision made with `wirken permissions pending`, and an import's `actor`, names the OS account the command ran as, `uid:<n> (<name>)` or `uid:<n>`, `sid:<SID>` on Windows, where it held the login name from `$USER`. |
 | 3.0.x  | Fourteen typed variants: `inbound_sender_refused`, `inbound_sender_added`, `inbound_sender_removed`, `approver_added`, `approver_removed`, `approval_chat_set`, `operator_command_refused`, `update_refused`, `mcp_credential_refresh_discarded`, `credential_destination_refused`, `credential_destination_granted`, `credential_destination_revoked`, `credential_handed_out` and `vault_migrated`. `approved_by` on `PermissionApproved` now holds the verified identity of the approver; the display name moves to `approver_display`. `denied_by` and `denier_display` on `PermissionDenied`. `channel` on `PermissionApproved`, `PermissionRenewed`, `PermissionRevoked`, `PermissionGrantExpired` and `PermissionGrantPruned`. `unavailable` in `HookDispatched` and `EgressHookDispatched` decisions. The Sentinel `DecidedBy` column. |
 
@@ -110,7 +110,8 @@ consume `McpEntryRefused`, `HookDispatched`, and
   on post-execution tool output)
 - `McpEntryVerified`, `McpEntryRefused` (mcp.json signature anchor)
 - `PhaseEntered`, `PhaseExited`, `SkillPermissionDenied`
-  (per-skill phase deny overlay)
+  (per-skill phase deny overlay; from 3.2.1 an `http_request` refusal
+  carries `method` and `host` on every axis)
 - `SessionScopedApprovalsCleared` (session-scoped approval lifecycle;
   `reason` is `session_ended`, or from 3.2.0 `agent_stopped` for the
   tombstones `wirken agents stop` writes)
@@ -198,6 +199,10 @@ Fields added to existing variants since 1.4.x:
   the approval prompt showed.
 - `SandboxEgressVerdict`: `mcp_server` (2.0.0), the contained MCP
   server the request came from; absent for an agent's own `exec`.
+  `method` (3.2.1), `CONNECT` for a tunnel, whose inner requests the
+  proxy does not see, or the verb of a plain HTTP request. The
+  `reason` `record_failed` (3.2.1), an allow whose verdict row did not
+  land, refused rather than connected unrecorded.
 - `LlmRequest`: `request_bytes` (2.2.0), the size of the messages and
   tool definitions the call sent, what `messages_hash` and `tools_hash`
   cover; `purpose` (2.2.0), absent for a normal turn, otherwise
@@ -294,7 +299,7 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `ToolOutputRedacted`   | `call_id`, `hook_id`, `agent_id`, `adapter_id?`, `sender_id?`, `reason`, `original_sha256`, `original_size`, `redacted_sha256`, `redacted_size` | 8 |
 | `LlmResponse`          | `agent_id`, `credential_id?`, `sender_id?`, `total_cost_usd_micros?`, `input_cost_usd_micros?`, `output_cost_usd_micros?` | 9 |
 | `BudgetExceeded`       | `agent_id`, `credential_id?`, `action` (`alerted` / `blocked`), `window`, `window_spend_usd_micros`, `ceiling_usd_micros` | 10 |
-| `SandboxEgressVerdict` | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `host`, `port`, `allowed`, `reason?` (`mode_none` / `not_allowed` / `ip_literal` / `port_not_allowed` / `method_not_allowed` / `malformed` / `resolution_failed` / `sensitivity_refused`), `mode` (`none` / `allowlist` / `open`), `sensitivity_basis[]`, `escalated` | (none here; reserved) |
+| `SandboxEgressVerdict` | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `host`, `port`, `method?` (3.2.1: `CONNECT`, or a plain-HTTP verb), `allowed`, `reason?` (`mode_none` / `not_allowed` / `ip_literal` / `port_not_allowed` / `method_not_allowed` / `malformed` / `resolution_failed` / `sensitivity_refused` / `record_failed`), `mode` (`none` / `allowlist` / `open`), `sensitivity_basis[]`, `escalated` | (none here; reserved) |
 | `SandboxEgressUnsupported` | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `mode` | (none here; reserved) |
 | `MemoryEntryWritten`   | `agent_id`, `channel`, `adapter_id`, `sender_id`, `entry_id`, `origin_session_id` | (none here; reserved) |
 | `CrossChannelMemoryRead` | `agent_id`, `adapter_id?`, `sender_id?`, `from_channel`, `to_channel`, `entry_count` | (none here; reserved) |
@@ -350,6 +355,8 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `AuthorityReloaded`    | `subject_kind` (`credential` / `adapter` / `hook`), `subject`, `change` (`rotated` / `rebound` / `removed` / `added` / `rekeyed`), `reloaded[]` | (none here; reserved) |
 
 `SandboxEgressVerdict` is emitted for every request the proxy decides, allow included, not only refusals. An allow row carries the same `sensitivity_basis`, which is what lets a detection assert that a connection was permitted after a given set of reads rather than seeing only what was turned away. Expect one row per proxied CONNECT.
+
+`audit.writer_halted` (3.2.1) is a legacy row the audit writer forwards as the last entry of a batch when it halts on persistent SQLite write failure. Its `detail` carries `reason` (`consecutive_write_failures` or `buffer_over_cap`), `consecutive_failures` and `unchained_events`, the number of events in that batch that never entered the chain because the write that would have chained them is what failed. A reconciliation of SIEM output against the signed log reads that gap as this halt, not as tampering; the alarm log holds a `writer_halted` record for it. Detection 5 does not fire on it: it is not an `audit.chain_broken` row.
 
 `sandbox_egress_denied` appears in no released binary: it existed in the 1.14.0 and 1.15.0 trees, neither of which produced release artifacts, and was replaced before the next release. No consumer needs to handle it.
 

@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-11-03T00:00:00Z",
+  "session_id": "default/webchat/c-1",
+  "seq": 14,
+  "kind": "skill_permission_denied",
+  "trust": "system",
+  "level": "info",
+  "event": {
+    "kind": "skill_permission_denied",
+    "axis": "http_method",
+    "requested": "http_request",
+    "agent_id": "default",
+    "trigger": null,
+    "denied_reason": "profile",
+    "method": "PUT",
+    "host": "pypi.org"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

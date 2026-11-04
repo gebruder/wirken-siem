@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-11-03T00:00:00+00:00",
+  "actor_kind": "service",
+  "actor_id": "audit-writer",
+  "action": "audit.writer_halted",
+  "target": "audit.db",
+  "channel": null,
+  "session": null,
+  "detail": {
+    "reason": "consecutive_write_failures",
+    "consecutive_failures": 8,
+    "unchained_events": 3
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

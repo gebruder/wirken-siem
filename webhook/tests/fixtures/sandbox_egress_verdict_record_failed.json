@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-11-03T00:00:00Z",
+  "session_id": "default/slack/c-2",
+  "seq": 21,
+  "kind": "sandbox_egress_verdict",
+  "trust": "system",
+  "level": "info",
+  "event": {
+    "kind": "sandbox_egress_verdict",
+    "host": "api.example.com",
+    "port": 443,
+    "method": "CONNECT",
+    "allowed": false,
+    "reason": "record_failed",
+    "mode": "allowlist",
+    "escalated": false,
+    "agent_id": "default",
+    "channel": "slack",
+    "adapter_id": "slack",
+    "sender_id": "U1"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}
