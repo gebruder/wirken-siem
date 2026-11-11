@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-11-11T00:00:00Z",
+  "session_id": "gateway-sandbox",
+  "seq": 1,
+  "kind": "exec_runtime_at_start",
+  "trust": "system",
+  "level": "info",
+  "event": {
+    "kind": "exec_runtime_at_start",
+    "mode": "gvisor",
+    "runtime": "runsc",
+    "available": false,
+    "reason": "runsc is not registered with the container runtime",
+    "sidecar_runtime": "runc"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-11-11T00:00:00Z",
+  "session_id": "default/webchat/c-1",
+  "seq": 7,
+  "kind": "exec_runtime_unavailable",
+  "trust": "system",
+  "level": "info",
+  "event": {
+    "kind": "exec_runtime_unavailable",
+    "mode": "gvisor",
+    "runtime": "runsc",
+    "reason": "runsc is not registered with the container runtime",
+    "agent_id": "default",
+    "adapter_id": "webchat",
+    "sender_id": "u1"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

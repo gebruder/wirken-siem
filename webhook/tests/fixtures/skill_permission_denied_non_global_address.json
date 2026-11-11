@@ -1,0 +1,24 @@
+{
+  "timestamp": "2026-11-11T00:00:00Z",
+  "session_id": "default/webchat/c-1",
+  "seq": 15,
+  "kind": "skill_permission_denied",
+  "trust": "system",
+  "level": "info",
+  "event": {
+    "kind": "skill_permission_denied",
+    "axis": "egress",
+    "requested": "internal.example.com",
+    "agent_id": "default",
+    "trigger": null,
+    "denied_reason": {
+      "kind": "non_global_address",
+      "address": "10.0.0.5"
+    },
+    "method": "GET",
+    "host": "internal.example.com"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

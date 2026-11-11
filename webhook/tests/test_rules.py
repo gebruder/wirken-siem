@@ -362,6 +362,9 @@ def test_evaluate_empty_when_no_detection_applies():
         "audit_legacy_message_inbound_dropped.json",
         "permission_denied_gateway_stopped.json",
         "leak_refused_key_file.json",
+        "exec_runtime_at_start.json",
+        "exec_runtime_unavailable.json",
+        "skill_permission_denied_non_global_address.json",
     ],
 )
 def test_evaluate_passes_rows_no_detection_reads(fixture):
