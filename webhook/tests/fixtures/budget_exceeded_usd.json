@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-11-13T12:34:00Z",
+  "session_id": "work/slack/C0123",
+  "seq": 41,
+  "kind": "budget_exceeded",
+  "trust": "system",
+  "event": {
+    "kind": "budget_exceeded",
+    "agent_id": "work",
+    "credential_id": "work-provider-key",
+    "window_spend_usd_micros": 10250000,
+    "ceiling_usd_micros": 10000000,
+    "window": "day",
+    "action": "blocked"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

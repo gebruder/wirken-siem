@@ -365,6 +365,11 @@ def test_evaluate_empty_when_no_detection_applies():
         "exec_runtime_at_start.json",
         "exec_runtime_unavailable.json",
         "skill_permission_denied_non_global_address.json",
+        # Detection 10 is not ported to the consumer: neither a USD
+        # breach nor a model-time one, which carries `model_time` and
+        # whose USD fields are not the breach, produces a match.
+        "budget_exceeded_usd.json",
+        "budget_exceeded_model_time.json",
     ],
 )
 def test_evaluate_passes_rows_no_detection_reads(fixture):

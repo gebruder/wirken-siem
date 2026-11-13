@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-11-13T12:40:00Z",
+  "session_id": "local/signal/c1",
+  "seq": 17,
+  "kind": "budget_exceeded",
+  "trust": "system",
+  "event": {
+    "kind": "budget_exceeded",
+    "agent_id": "local",
+    "window_spend_usd_micros": 0,
+    "ceiling_usd_micros": 0,
+    "window": "day",
+    "action": "blocked",
+    "model_time": {
+      "window_model_seconds": 3605,
+      "ceiling_model_seconds": 3600
+    }
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

@@ -42,7 +42,10 @@ pins this invariant.
 13) plus `evaluate(event, skill_dirs, installs=None) -> list[match]`.
 Each rule consumes one webhook event dict and returns
 `Optional[Match]`. Detections 9 to 11 are not ported to the webhook
-consumer.
+consumer, so a `budget_exceeded` row produces no match, whichever
+ceiling it reports. The fixtures keep one of each: a USD row and a
+model-time row, which carries `model_time` and whose USD fields are not
+the breach.
 
 Detection 12 needs state across events, so it lives in
 `InstallTracker`, which `evaluate` runs when given one; the consumer
