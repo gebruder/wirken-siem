@@ -4,8 +4,15 @@ description: |
   Detection 10. Fires on any BudgetExceeded row emitted by the wirken
   runtime's pre-call budget gate. `action` is `blocked` (the LLM call
   was refused, an enforced stop) or `alerted` (the ceiling was crossed
-  and the call proceeded). Requires audit schema 1.12.0 (the
-  budget_exceeded event) and the default budget_exceeded forwarding.
+  and the call proceeded). `Breach` says which ceiling the row reports:
+  `usd`, read from WindowSpendUsdMicros and CeilingUsdMicros, or
+  `model_time`, on a row that carries `model_time`, read from
+  WindowModelSeconds and CeilingModelSeconds. On a model-time row the
+  USD columns hold the window's USD spend and ceiling beside it, 0
+  where the budget sets none, and are not the breach. Requires audit
+  schema 1.12.0 (the budget_exceeded event) and the default
+  budget_exceeded forwarding; `model_time` is on rows from Wirken main
+  after 3.3.1.
 severity: Medium
 status: Available
 requiredDataConnectors: []
@@ -30,8 +37,11 @@ query: |
       AgentId,
       Action = tostring(body.action),
       Window = tostring(body.window),
+      Breach = iff(isnotnull(body.model_time.ceiling_model_seconds), "model_time", "usd"),
       WindowSpendUsdMicros = tolong(body.window_spend_usd_micros),
-      CeilingUsdMicros = tolong(body.ceiling_usd_micros)
+      CeilingUsdMicros = tolong(body.ceiling_usd_micros),
+      WindowModelSeconds = tolong(body.model_time.window_model_seconds),
+      CeilingModelSeconds = tolong(body.model_time.ceiling_model_seconds)
 entityMappings:
   - entityType: Account
     fieldMappings:
