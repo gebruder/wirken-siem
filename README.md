@@ -190,7 +190,8 @@ Fields added to existing variants since 1.4.x:
   sessions. Carries the originating principal across the LLM call
   boundary for correlation with the sibling `UserMessage` / `ToolResult`
   rows.
-- `BudgetExceeded`: `tool` (1.20.0).
+- `BudgetExceeded`: `tool` (1.20.0); `model_time` (Wirken main after
+  3.3.1), present when the row reports the model-time ceiling.
 - `LlmRequest`: `tools_hash_version` (1.20.0).
 - `SubagentSpawned`: `max_permission_tier` (1.20.0).
 - `AssistantToolCalls`: `text` (1.24.0), what the model said in the
@@ -259,6 +260,22 @@ any breach the wirken runtime records; `action` distinguishes a block
 runtime does the ceiling comparison, so this detection only surfaces
 the event.
 
+A budget can hold two ceilings, and the row says which one it reports.
+A row with no `model_time` reports the USD ceiling:
+`window_spend_usd_micros` against `ceiling_usd_micros`. A row that
+carries `model_time` (Wirken main after 3.3.1) reports the model-time
+ceiling: `model_time.window_model_seconds`, the wall-clock seconds the
+agent's model calls took in the window, against
+`model_time.ceiling_model_seconds`. On that row the USD fields hold the
+window's USD spend and the USD ceiling beside it, `0` where the budget
+sets none, and are not the breach. Each platform keeps the two apart:
+the Splunk search and the Sentinel rule add a `breach` / `Breach`
+column (`usd` or `model_time`) and the model-time figures; Datadog has
+a monitor for each (`budget_exceeded.json` for USD rows,
+`budget_exceeded_model_time.json` for model-time rows). A USD row is
+reported with the fields it always had. The webhook consumer does not
+port this detection.
+
 From audit schema 2.2.0, compaction summary calls are charged to the
 agent's budget like a turn; before, they were made but not charged.
 An agent near its ceiling can trip this detection sooner after the
@@ -308,7 +325,7 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `HookDispatched`       | `hook_id`, `tool_name`, `agent_id`, `adapter_id?`, `sender_id?`, `decision.kind` (`allow` / `deny` / `timeout` / `unavailable`), `decision.reason?` | 7 |
 | `ToolOutputRedacted`   | `call_id`, `hook_id`, `agent_id`, `adapter_id?`, `sender_id?`, `reason`, `original_sha256`, `original_size`, `redacted_sha256`, `redacted_size` | 8 |
 | `LlmResponse`          | `agent_id`, `credential_id?`, `sender_id?`, `total_cost_usd_micros?`, `input_cost_usd_micros?`, `output_cost_usd_micros?` | 9 |
-| `BudgetExceeded`       | `agent_id`, `credential_id?`, `action` (`alerted` / `blocked`), `window`, `window_spend_usd_micros`, `ceiling_usd_micros` | 10 |
+| `BudgetExceeded`       | `agent_id`, `credential_id?`, `action` (`alerted` / `blocked`), `window`, `window_spend_usd_micros`, `ceiling_usd_micros`, `model_time?` (`window_model_seconds`, `ceiling_model_seconds`; Wirken main after 3.3.1) | 10 |
 | `SandboxEgressVerdict` | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `host`, `port`, `method?` (3.2.1: `CONNECT`, or a plain-HTTP verb), `allowed`, `reason?` (`mode_none` / `not_allowed` / `ip_literal` / `port_not_allowed` / `method_not_allowed` / `malformed` / `resolution_failed` / `sensitivity_refused` / `record_failed`), `mode` (`none` / `allowlist` / `open`), `sensitivity_basis[]`, `escalated` | (none here; reserved) |
 | `SandboxEgressUnsupported` | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `mode` | (none here; reserved) |
 | `MemoryEntryWritten`   | `agent_id`, `channel`, `adapter_id`, `sender_id`, `entry_id`, `origin_session_id` | (none here; reserved) |
