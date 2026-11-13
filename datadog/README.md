@@ -156,6 +156,7 @@ seen AND no matching alarm-log row within 60s).
 | Tool output redacted          | `monitors/tool_output_redacted.json` |
 | Per-agent LLM cost anomaly    | `monitors/agent_cost_anomaly.json` |
 | Per-agent budget exceeded     | `monitors/budget_exceeded.json`   |
+| Per-agent model-time budget exceeded | `monitors/budget_exceeded_model_time.json` |
 | Exec prompt and run disagree  | `monitors/exec_location_disagreement.json` |
 | Binary changed outside update | `monitors/binary_changed_outside_update.json` |
 | No install record (informational) | `monitors/binary_changed_outside_update_unrecorded.json` |

@@ -1,0 +1,16 @@
+{
+  "name": "Wirken: per-agent model-time budget exceeded",
+  "type": "log alert",
+  "query": "logs(\"@ddsource:wirken @wirken.kind:budget_exceeded @wirken.event.model_time.ceiling_model_seconds:*\").index(\"main\").rollup(\"count\").last(\"15m\") > 0",
+  "message": "A Wirken agent reached its per-agent model-time ceiling for the current budget window: the wall-clock seconds its model calls took, as the gateway measured them.\n\nDetection: budget_exceeded (10), model-time ceiling\nSeverity baseline: medium\n\n`@wirken.event.action` is `blocked` (the LLM call was refused, an enforced stop) or `alerted` (the ceiling was crossed and the call proceeded). Pivot on @wirken.event.agent_id, @wirken.event.window, @wirken.event.model_time.window_model_seconds, @wirken.event.model_time.ceiling_model_seconds.\n\nOn this row `@wirken.event.window_spend_usd_micros` and `@wirken.event.ceiling_usd_micros` hold the window's USD spend and the USD ceiling beside it, 0 where the budget sets none. They are not the breach.\n\nEmitted by the wirken runtime's pre-call budget gate. Requires the `model_time` field on budget_exceeded (Wirken main after 3.3.1) and the default budget_exceeded forwarding.\n\n@security-team",
+  "tags": ["service:wirken", "detection:budget_exceeded", "source:wirken-siem"],
+  "options": {
+    "thresholds": {"critical": 0},
+    "notify_audit": true,
+    "include_tags": true,
+    "evaluation_delay": 60,
+    "new_group_delay": 60,
+    "renotify_interval": 30
+  },
+  "priority": 3
+}
