@@ -19,6 +19,7 @@ binary.
 | 0.6         | 1.3.x – 3.1.x       |
 | 0.7         | 1.3.x – 3.2.x       |
 | 0.8         | 1.3.x – 3.3.x       |
+| 0.9         | 1.3.x – 3.4.x       |
 
 wirken-siem 0.1 shipped detections 1-8 against audit schema 1.3.x
 through 1.8.x. 0.2 adds detections 9 (per-agent cost anomaly) and 10
@@ -41,7 +42,8 @@ hook that is not connected refuses the call with that decision.
 Detections 1-6 and 8-13 fire unmodified. 0.6 extends support through
 3.1.x; detections 1-13 fire unmodified. 0.7 extends support through
 3.2.x; detections 1-13 fire unmodified. 0.8 extends support through
-3.3.x; detections 1-13 fire unmodified.
+3.3.x; detections 1-13 fire unmodified. 0.9 extends support through
+3.4.x; detections 1-13 fire unmodified.
 
 Audit-schema changes in the 2.x and 3.x series, one row per minor that
 changed something. 2.1.0, 2.4.x and 2.5.x changed the audit schema not
@@ -52,6 +54,7 @@ at all.
 | 2.0.x  | Twelve typed variants: `llm_request_failed`; the adapter lifecycle events `adapter_connect`, `adapter_disconnect`, `adapter_restart` and `adapter_restart_abandoned`; the MCP server lifecycle events `mcp_server_sandboxed`, `mcp_server_unsandboxed`, `mcp_server_exited`, `mcp_server_restart` and `mcp_server_restart_abandoned`; `mcp_credential_refetched`; and `leak_refused`. `mcp_server` on `SandboxEgressVerdict`. A level on every typed row. The `connection.panic` legacy action. Sequence numbers are never reused after a rewind. No 2.x binary writes the `wasm_skill_call` `Action` label. |
 | 2.2.x  | `request_bytes` and `purpose` on `LlmRequest`. Compaction summary and tool-call probe model calls are recorded as `llm_request` / `llm_response` pairs. |
 | 2.3.x  | The `binary_installed` typed variant. `build` on the `SessionStart` chain head. A `{version, commit, dirty}` detail on the `gateway.start` legacy row. |
+| 3.4.x  | No new variant. Optional `stop_reason` and `stop_reason_raw` on `llm_response`. Optional `model_time` on `budget_exceeded`. Optional `limits` on the `sandbox` of a `tool_result` for an `exec`. The input cost on `llm_response` now prices prompt-cache writes and reads. |
 | 3.3.x  | Two typed variants: `exec_runtime_at_start` and `exec_runtime_unavailable`. The `denied_reason` kind `non_global_address`, with `address`, on `skill_permission_denied`. Optional `reasoning` on `assistant_tool_calls`. The `denial_reason` value `arguments too long to show for approval`. |
 | 3.2.x  | Three typed variants: `session_liveness_unavailable`, `agent_stopped` and `agent_resumed`. `operator_command_refused` on `gateway-operator` for the authority-changing subcommands of sixteen `wirken` commands, with an empty `invocation` for `setup` and `import`. The `denial_reason` values `agent stopped`, `gateway stopped` and `no terminal for approval` on `PermissionDenied`. The `reason` `agent_stopped` on `SessionScopedApprovalsCleared`. `credential` on `LeakRefused` can name a key file by its path under the data directory. The legacy actions `message.refused`, `cron.skipped` and `message.inbound_dropped`. From 3.2.1: `method` and `host` on `SkillPermissionDenied` for an `http_request` refusal; `method` and the `reason` `record_failed` on `SandboxEgressVerdict`; the legacy action `audit.writer_halted`, at level `error`, closing the forward-only drain of a write-failure halt. |
 | 3.1.x  | Four typed variants: `read_sensitivity_observed`, `read_sensitivity_exempted`, `operator_command` and `authority_reloaded`. The cause `credential_changed` on `AdapterRestart` and `McpServerRestart`. Every actor field a `wirken` command writes, `added_by`, `removed_by`, `granted_by`, `revoked_by`, `set_by`, `run_by`, the `approved_by` and `denied_by` of a decision made with `wirken permissions pending`, and an import's `actor`, names the OS account the command ran as, `uid:<n> (<name>)` or `uid:<n>`, `sid:<SID>` on Windows, where it held the login name from `$USER`. |
@@ -190,8 +193,15 @@ Fields added to existing variants since 1.4.x:
   sessions. Carries the originating principal across the LLM call
   boundary for correlation with the sibling `UserMessage` / `ToolResult`
   rows.
-- `BudgetExceeded`: `tool` (1.20.0); `model_time` (Wirken main after
-  3.3.1), present when the row reports the model-time ceiling.
+- `BudgetExceeded`: `tool` (1.20.0); `model_time` (3.4.0), present
+  when the row reports the model-time ceiling.
+- `LlmResponse`: `stop_reason` (3.4.0), why the provider says the reply
+  ended: `end_turn`, `tool_use`, `max_tokens`, `refusal`,
+  `stop_sequence` or `other`; `stop_reason_raw` (3.4.0), the provider's
+  own word it was mapped from. Both absent for a provider that reports
+  none. From 3.4.0 `input_cost_usd_micros` includes prompt-cache writes
+  at 1.25 times the input price and reads at 0.1 times it; rows already
+  written are not repriced.
 - `LlmRequest`: `tools_hash_version` (1.20.0).
 - `SubagentSpawned`: `max_permission_tier` (1.20.0).
 - `AssistantToolCalls`: `text` (1.24.0), what the model said in the
@@ -204,7 +214,9 @@ Fields added to existing variants since 1.4.x:
   `superseded_signature` (1.24.0).
 - `PermissionApproved`: `tier`, `expires_at` (1.24.0).
 - `ToolResult`: `sandbox` (1.24.0), `{mode, runtime, container_id?}`
-  for an `exec`: where the command ran.
+  for an `exec`: where the command ran. `limits` (3.4.0),
+  `{memory_mb, pids, timeout_secs}`, present when the operator's
+  `sandbox.json` set a limit away from the defaults.
 - `PermissionApproved` / `PermissionDenied`: `exec_location` (1.28.0),
   `{mode, text}` for an `exec` an operator was asked about: the line
   the approval prompt showed.
@@ -263,7 +275,7 @@ the event.
 A budget can hold two ceilings, and the row says which one it reports.
 A row with no `model_time` reports the USD ceiling:
 `window_spend_usd_micros` against `ceiling_usd_micros`. A row that
-carries `model_time` (Wirken main after 3.3.1) reports the model-time
+carries `model_time` (3.4.0) reports the model-time
 ceiling: `model_time.window_model_seconds`, the wall-clock seconds the
 agent's model calls took in the window, against
 `model_time.ceiling_model_seconds`. On that row the USD fields hold the
