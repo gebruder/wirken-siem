@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-11-23T00:00:00Z",
+  "session_id": "proxy-tok1-run-7",
+  "seq": 2,
+  "kind": "proxy_tool_call",
+  "trust": "system",
+  "level": "info",
+  "event": {
+    "kind": "proxy_tool_call",
+    "call_id": "c1",
+    "token_id": "tok1",
+    "agent_id": "a1",
+    "mcp_session": "s1",
+    "tool": "files__read",
+    "success": true,
+    "latency_ms": 12,
+    "request_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    "request_bytes": 120,
+    "response_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    "response_bytes": 64
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

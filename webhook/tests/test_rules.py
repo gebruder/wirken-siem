@@ -371,6 +371,9 @@ def test_evaluate_empty_when_no_detection_applies():
         "proxy_response.json",
         "proxy_refused.json",
         "proxy_archive_redacted.json",
+        "proxy_tools_listed.json",
+        "proxy_tool_call.json",
+        "proxy_tool_refused.json",
         # Detection 10 is not ported to the consumer: neither a USD
         # breach nor a model-time one, which carries `model_time` and
         # whose USD fields are not the breach, produces a match.
