@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-11-23T00:00:00Z",
+  "session_id": "proxy-tok1-run-7",
+  "seq": 2,
+  "kind": "proxy_response",
+  "trust": "system",
+  "level": "info",
+  "event": {
+    "kind": "proxy_response",
+    "request_id": "r1",
+    "token_id": "tok1",
+    "status": 200,
+    "latency_ms": 840,
+    "input_tokens": 12,
+    "output_tokens": 30,
+    "response_sha256": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae",
+    "response_bytes": 410,
+    "complete": true
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-11-23T00:00:00Z",
+  "session_id": "gateway-mcp",
+  "seq": 5,
+  "kind": "mcp_inject_refused",
+  "trust": "system",
+  "level": "info",
+  "event": {
+    "kind": "mcp_inject_refused",
+    "server_name": "github",
+    "agent_id": "default",
+    "host": "api.github.com",
+    "method": "GET",
+    "path": "/raw/o/r",
+    "reason": "unmapped_path"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

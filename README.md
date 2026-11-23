@@ -20,6 +20,7 @@ binary.
 | 0.7         | 1.3.x – 3.2.x       |
 | 0.8         | 1.3.x – 3.3.x       |
 | 0.9         | 1.3.x – 3.4.x       |
+| 0.10        | 1.3.x – 3.5.x       |
 
 wirken-siem 0.1 shipped detections 1-8 against audit schema 1.3.x
 through 1.8.x. 0.2 adds detections 9 (per-agent cost anomaly) and 10
@@ -43,7 +44,8 @@ Detections 1-6 and 8-13 fire unmodified. 0.6 extends support through
 3.1.x; detections 1-13 fire unmodified. 0.7 extends support through
 3.2.x; detections 1-13 fire unmodified. 0.8 extends support through
 3.3.x; detections 1-13 fire unmodified. 0.9 extends support through
-3.4.x; detections 1-13 fire unmodified.
+3.4.x; detections 1-13 fire unmodified. 0.10 extends support through
+3.5.x; detections 1-13 fire unmodified.
 
 Audit-schema changes in the 2.x and 3.x series, one row per minor that
 changed something. 2.1.0, 2.4.x and 2.5.x changed the audit schema not
@@ -54,6 +56,7 @@ at all.
 | 2.0.x  | Twelve typed variants: `llm_request_failed`; the adapter lifecycle events `adapter_connect`, `adapter_disconnect`, `adapter_restart` and `adapter_restart_abandoned`; the MCP server lifecycle events `mcp_server_sandboxed`, `mcp_server_unsandboxed`, `mcp_server_exited`, `mcp_server_restart` and `mcp_server_restart_abandoned`; `mcp_credential_refetched`; and `leak_refused`. `mcp_server` on `SandboxEgressVerdict`. A level on every typed row. The `connection.panic` legacy action. Sequence numbers are never reused after a rewind. No 2.x binary writes the `wasm_skill_call` `Action` label. |
 | 2.2.x  | `request_bytes` and `purpose` on `LlmRequest`. Compaction summary and tool-call probe model calls are recorded as `llm_request` / `llm_response` pairs. |
 | 2.3.x  | The `binary_installed` typed variant. `build` on the `SessionStart` chain head. A `{version, commit, dirty}` detail on the `gateway.start` legacy row. |
+| 3.5.x  | Seven typed variants: `child_opened`, `mcp_credential_injected`, `mcp_inject_refused`, `proxy_request`, `proxy_response`, `proxy_refused` and `proxy_archive_redacted`. Optional `step` on `assistant_tool_calls`, `llm_request` and `llm_response`. Optional `estimated_cost_usd_micros` and `reported` on `llm_response`. `secrets_injected` and optional `inject_host` on `mcp_server_sandboxed`. The `approved_via` kind `grant`, with `grant`. The `reason` `injected_host` on `sandbox_egress_verdict`. The lanes `gateway-proxy`, `proxy-<token id>` and `proxy-<token id>-<label>`. |
 | 3.4.x  | No new variant. Optional `stop_reason` and `stop_reason_raw` on `llm_response`. Optional `model_time` on `budget_exceeded`. Optional `limits` on the `sandbox` of a `tool_result` for an `exec`. The input cost on `llm_response` now prices prompt-cache writes and reads. |
 | 3.3.x  | Two typed variants: `exec_runtime_at_start` and `exec_runtime_unavailable`. The `denied_reason` kind `non_global_address`, with `address`, on `skill_permission_denied`. Optional `reasoning` on `assistant_tool_calls`. The `denial_reason` value `arguments too long to show for approval`. |
 | 3.2.x  | Three typed variants: `session_liveness_unavailable`, `agent_stopped` and `agent_resumed`. `operator_command_refused` on `gateway-operator` for the authority-changing subcommands of sixteen `wirken` commands, with an empty `invocation` for `setup` and `import`. The `denial_reason` values `agent stopped`, `gateway stopped` and `no terminal for approval` on `PermissionDenied`. The `reason` `agent_stopped` on `SessionScopedApprovalsCleared`. `credential` on `LeakRefused` can name a key file by its path under the data directory. The legacy actions `message.refused`, `cron.skipped` and `message.inbound_dropped`. From 3.2.1: `method` and `host` on `SkillPermissionDenied` for an `http_request` refusal; `method` and the `reason` `record_failed` on `SandboxEgressVerdict`; the legacy action `audit.writer_halted`, at level `error`, closing the forward-only drain of a write-failure halt. |
@@ -171,6 +174,16 @@ consume `McpEntryRefused`, `HookDispatched`, and
 - `ExecRuntimeAtStart` (3.3.0, the container runtime `wirken run` found
   for `exec` when it started), `ExecRuntimeUnavailable` (3.3.0, an `exec`
   refused because that runtime could not run a container)
+- `ChildOpened` (3.5.0, the opening message of a child process that
+  runs a turn: the tools, tool servers, model and sign-in it named)
+- `McpCredentialInjected`, `McpInjectRefused` (3.5.0, one request a
+  contained MCP server sent to the host its injected credential is
+  bound to, made with the credential set or refused)
+- `ProxyRequest`, `ProxyResponse`, `ProxyRefused` (3.5.0, one call a
+  client made through the inference proxy: forwarded, answered or
+  refused)
+- `ProxyArchiveRedacted` (3.5.0, the key of an archived proxy body
+  destroyed)
 - `UpdateRefused` (3.0.0, `wirken update` refused inside a Wirken
   `exec`, or a rollback a migrated vault would break)
 - `McpCredentialRefreshDiscarded` (3.0.0, a refreshed OAuth credential
@@ -202,6 +215,29 @@ Fields added to existing variants since 1.4.x:
   none. From 3.4.0 `input_cost_usd_micros` includes prompt-cache writes
   at 1.25 times the input price and reads at 0.1 times it; rows already
   written are not repriced.
+- `AssistantToolCalls`, `LlmRequest`, `LlmResponse`: `step` (3.5.0),
+  the step of a run the call was made for, when the caller names one:
+  a Lyrik run writes the walk's name, `replay` or `probe`. The same
+  value on a request, its response and the tool calls its reply
+  carried.
+- `LlmResponse`: `estimated_cost_usd_micros` (3.5.0), what a call made
+  on a plan would have cost at the pricing table's API rates. Nothing
+  was billed, and the three `*_cost_usd_micros` fields are absent on
+  that row. `reported` (3.5.0), `{by, model, key_source?,
+  cache_write?}`, present when a child process made the call and
+  reported it; `by` is `child`, `cache_write` is
+  `{ephemeral_5m_input_tokens, ephemeral_1h_input_tokens}`. Such a row
+  has no `LlmRequest`.
+- `McpServerSandboxed`: `secrets_injected` (3.5.0), the variables that
+  hold a placeholder in the container; `inject_host` (3.5.0), the host
+  the injected credential is bound to. Both absent for a server with
+  no injected credential.
+- `PermissionApproved`: the `approved_via` kind `grant` (3.5.0), with
+  `grant`, the action key of the `PermissionApproved` row whose grant
+  covered the call; no surface asked.
+- `SandboxEgressVerdict`: the `reason` `injected_host` (3.5.0), a
+  request to the host a contained MCP server's injected credential is
+  bound to, made outside the injected route.
 - `LlmRequest`: `tools_hash_version` (1.20.0).
 - `SubagentSpawned`: `max_permission_tier` (1.20.0).
 - `AssistantToolCalls`: `text` (1.24.0), what the model said in the
@@ -338,7 +374,7 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `ToolOutputRedacted`   | `call_id`, `hook_id`, `agent_id`, `adapter_id?`, `sender_id?`, `reason`, `original_sha256`, `original_size`, `redacted_sha256`, `redacted_size` | 8 |
 | `LlmResponse`          | `agent_id`, `credential_id?`, `sender_id?`, `total_cost_usd_micros?`, `input_cost_usd_micros?`, `output_cost_usd_micros?` | 9 |
 | `BudgetExceeded`       | `agent_id`, `credential_id?`, `action` (`alerted` / `blocked`), `window`, `window_spend_usd_micros`, `ceiling_usd_micros`, `model_time?` (`window_model_seconds`, `ceiling_model_seconds`; Wirken main after 3.3.1) | 10 |
-| `SandboxEgressVerdict` | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `host`, `port`, `method?` (3.2.1: `CONNECT`, or a plain-HTTP verb), `allowed`, `reason?` (`mode_none` / `not_allowed` / `ip_literal` / `port_not_allowed` / `method_not_allowed` / `malformed` / `resolution_failed` / `sensitivity_refused` / `record_failed`), `mode` (`none` / `allowlist` / `open`), `sensitivity_basis[]`, `escalated` | (none here; reserved) |
+| `SandboxEgressVerdict` | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `host`, `port`, `method?` (3.2.1: `CONNECT`, or a plain-HTTP verb), `allowed`, `reason?` (`mode_none` / `not_allowed` / `ip_literal` / `port_not_allowed` / `method_not_allowed` / `malformed` / `resolution_failed` / `sensitivity_refused` / `record_failed` / `injected_host`), `mode` (`none` / `allowlist` / `open`), `sensitivity_basis[]`, `escalated` | (none here; reserved) |
 | `SandboxEgressUnsupported` | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `mode` | (none here; reserved) |
 | `MemoryEntryWritten`   | `agent_id`, `channel`, `adapter_id`, `sender_id`, `entry_id`, `origin_session_id` | (none here; reserved) |
 | `CrossChannelMemoryRead` | `agent_id`, `adapter_id?`, `sender_id?`, `from_channel`, `to_channel`, `entry_count` | (none here; reserved) |
@@ -359,10 +395,10 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `AdapterDisconnect`    | `adapter_id`, `channel`, `pubkey_fingerprint`, `reason` (`ended` / `panic`) | (none here; reserved) |
 | `AdapterRestart`       | `adapter_id`, `channel`, `attempt`, `cause` (`process_exited` / `connection_ended` / `connection_panicked` / `spawn_failed` / `credential_changed`), `exit`, `delay_ms`, `connected_for_ms?` | (none here; reserved) |
 | `AdapterRestartAbandoned` | `adapter_id`, `channel`, `attempts`, `last_cause`, `last_exit` | (none here; reserved) |
-| `LlmRequest`           | `agent_id`, `credential_id?`, `sender_id?`, `request_id`, `provider`, `model`, `messages_hash`, `tools_hash`, `tools_hash_version`, `request_bytes?`, `purpose?` (`compaction_summary` / `tool_call_probe`; absent for a turn) | (none here; reserved) |
+| `LlmRequest`           | `agent_id`, `credential_id?`, `sender_id?`, `request_id`, `provider`, `model`, `messages_hash`, `tools_hash`, `tools_hash_version`, `request_bytes?`, `purpose?` (`compaction_summary` / `tool_call_probe`; absent for a turn), `step?` | (none here; reserved) |
 | `LlmRequestFailed`     | `agent_id`, `credential_id?`, `sender_id?`, `request_id`, `error`, `latency_ms` | (none here; reserved) |
 | `LeakRefused`          | `agent_id`, `channel?`, `adapter_id?`, `sender_id?`, `credential` (a vault entry name, or from 3.2.0 a key file's path under the data directory: `agents/<id>/identity.key`, `audit/audit-signing.key`, `operator/operator.key`), `surface` (`tool_output` / `tool_arguments` / `provider_request` / `reply` / `user_message` / `skill_load`), `tool_name?`, `server_name?`, `skill_name?` | (none here; reserved) |
-| `McpServerSandboxed`   | `agent_id`, `server_name`, `container_id`, `image`, `image_id?`, `image_digest?`, `runtime` (`docker` / `gvisor` / `host`), `memory_bytes`, `nano_cpus`, `pids`, `mounts[]`, `egress_hosts[]`, `secrets_as_files[]`, `secrets_in_env[]` | (none here; reserved) |
+| `McpServerSandboxed`   | `agent_id`, `server_name`, `container_id`, `image`, `image_id?`, `image_digest?`, `runtime` (`docker` / `gvisor` / `host`), `memory_bytes`, `nano_cpus`, `pids`, `mounts[]`, `egress_hosts[]`, `secrets_as_files[]`, `secrets_in_env[]`, `secrets_injected[]`, `inject_host?` | (none here; reserved) |
 | `McpServerUnsandboxed` | `agent_id`, `server_name` | (none here; reserved) |
 | `McpServerExited`      | `agent_id`, `server_name`, `container_id`, `exit_code?`, `stopped_by_proxy` | (none here; reserved) |
 | `McpServerRestart`     | `agent_id`, `server_name`, `attempt`, `cause` (`exited` / `start_failed` / `initialize_failed` / `credential_changed`), `detail`, `delay_ms`, `ran_for_ms?` | (none here; reserved) |
@@ -383,6 +419,13 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `AgentResumed`         | `agent_id`, `resumed_by` | (none here; reserved) |
 | `ExecRuntimeAtStart`   | `mode` (`off` / `exec_only` / `gvisor`), `runtime?`, `available`, `reason?`, `sidecar_runtime?` | (none here; reserved) |
 | `ExecRuntimeUnavailable` | `mode`, `runtime?`, `reason`, `agent_id`, `adapter_id?`, `sender_id?` | (none here; reserved) |
+| `ChildOpened`          | `agent_id`, `step?`, `tools[]`, `servers[]?` (`{name, status}`), `key_source?`, `model?`, `refused?` | (none here; reserved) |
+| `McpCredentialInjected` | `agent_id`, `server_name`, `credential`, `host`, `method`, `path` | (none here; reserved) |
+| `McpInjectRefused`     | `agent_id`, `server_name`, `host`, `method`, `path`, `reason` (`unmapped_path` / `path_shape` / `malformed` / `resolution_failed` / `credential_unavailable` / `credential_in_response` / `record_failed`) | (none here; reserved) |
+| `ProxyRequest`         | `request_id`, `token_id`, `token_name`, `upstream`, `provider`, `model`, `shape` (`openai_chat` / `anthropic_messages`), `stream`, `request_sha256`, `request_bytes`, `credential_id?`, `archived?` | (none here; reserved) |
+| `ProxyResponse`        | `request_id`, `token_id`, `status`, `latency_ms`, `input_tokens?`, `output_tokens?`, `cache_read_input_tokens?`, `cache_creation_input_tokens?`, `total_cost_usd_micros?`, `response_sha256`, `response_bytes`, `complete`, `archived?` | (none here; reserved) |
+| `ProxyRefused`         | `token_id?`, `shape?`, `model?`, `reason` (`unknown_token` / `revoked_token` / `malformed` / `shape_not_spoken` / `model_not_allowed` / `budget_exceeded` / `leak_refused` / `credential_refused` / `record_failed` / `archive_failed`) | (none here; reserved) |
+| `ProxyArchiveRedacted` | `sha256`, `operator`, `reason`, `session?` | (none here; reserved) |
 | `UpdateRefused`        | `invocation` (`check` / `install` / `rollback`), `reason` (`inside_exec` / `vault_format`) | (none here; reserved) |
 | `McpCredentialRefreshDiscarded` | `credential`, `reason` (`removed` / `reauthorized` / `unreadable`) | (none here; reserved) |
 | `CredentialDestinationRefused` | `credential`, `destination_kind` (`host` / `mcp_server` / `provider` / `adapter` / `plan`), `destination`, `named_by` | (none here; reserved) |
@@ -527,6 +570,30 @@ gateway restarts with the runtime present, and `reason` says why.
 forwarded by default at `info`, with the agent column set. A call whose
 arguments an approval card would cut is a `PermissionDenied` with
 `denial_reason` `arguments too long to show for approval`. Detections 1-13
+fire unmodified.
+
+From 3.5.0: `McpCredentialInjected` and `McpInjectRefused` are on
+`gateway-mcp`, forwarded by default at `info`, with the agent column set
+and no adapter or sender. An injection row is written before its request
+is made, one per request, a followed redirect included; `path` carries no
+query, and the rows name the credential, never its value.
+`ProxyRequest` and `ProxyResponse` are on the conversation's lane,
+`proxy-<token id>-<label>`, where the label is the one the client sent or
+the one the proxy gave the conversation. `ProxyRefused` is on
+`proxy-<token id>`, or on `gateway-proxy` with no `token_id` when no known
+token came with the request, at most one such row a second.
+`ProxyArchiveRedacted` is on `gateway-proxy`. The four are forwarded by
+default at `info`, with no agent or adapter column; the sender column
+holds `proxy-token:<token id>` on the first three where the row has a
+`token_id`, and `ProxyArchiveRedacted` has none of the three. They carry
+hashes and counts: no token, key or body. A `ProxyResponse` with
+`complete: false` ended before the provider's answer did.
+`ProxyRefused` with `reason` `budget_exceeded` is a proxy token's spend
+ceiling; it is not a `BudgetExceeded` row and detection 10 does not read
+it. `ChildOpened` is on the session of the turn, with the agent column
+set, and is outside the default forwarded set. An `LlmResponse` with
+`reported` or `estimated_cost_usd_micros` carries no
+`total_cost_usd_micros`, so detection 9 does not count it. Detections 1-13
 fire unmodified.
 
 A query that matched a CLI actor field against a login name, such as

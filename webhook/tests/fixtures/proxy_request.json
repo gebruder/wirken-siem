@@ -1,0 +1,24 @@
+{
+  "timestamp": "2026-11-23T00:00:00Z",
+  "session_id": "proxy-tok1-run-7",
+  "seq": 1,
+  "kind": "proxy_request",
+  "trust": "system",
+  "level": "info",
+  "event": {
+    "kind": "proxy_request",
+    "request_id": "r1",
+    "token_id": "tok1",
+    "token_name": "laptop",
+    "upstream": "local",
+    "provider": "ollama",
+    "model": "m",
+    "shape": "openai_chat",
+    "stream": false,
+    "request_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    "request_bytes": 120
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

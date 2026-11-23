@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-11-23T00:00:00Z",
+  "session_id": "gateway-proxy",
+  "seq": 1,
+  "kind": "proxy_refused",
+  "trust": "system",
+  "level": "info",
+  "event": {
+    "kind": "proxy_refused",
+    "shape": "openai_chat",
+    "reason": "unknown_token"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

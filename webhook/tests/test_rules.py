@@ -365,6 +365,12 @@ def test_evaluate_empty_when_no_detection_applies():
         "exec_runtime_at_start.json",
         "exec_runtime_unavailable.json",
         "skill_permission_denied_non_global_address.json",
+        "mcp_credential_injected.json",
+        "mcp_inject_refused.json",
+        "proxy_request.json",
+        "proxy_response.json",
+        "proxy_refused.json",
+        "proxy_archive_redacted.json",
         # Detection 10 is not ported to the consumer: neither a USD
         # breach nor a model-time one, which carries `model_time` and
         # whose USD fields are not the breach, produces a match.
