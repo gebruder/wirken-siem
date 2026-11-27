@@ -101,6 +101,19 @@ def test_exec_fork_pairing_emits_partial_match_on_tool_result_side():
     assert m["output_size"] == len("200 OK\n2048 bytes\n")
 
 
+def test_exec_fork_pairing_reads_a_tool_result_with_timed_out_and_reached_as_before():
+    # 3.6.2 adds `timed_out` and `reached` to the `sandbox` of an exec
+    # result. The pairing reads neither and matches the row as it
+    # matches one without them.
+    ev = load_fixture("tool_result_exec_timed_out_reached.json")
+    m = rules.detect_exec_fork_pairing(ev)
+    assert m is not None
+    assert m["shape"] == "tool_result"
+    assert m["call_id"] == "call-abc"
+    assert m["success"] is False
+    assert m["output_size"] == len("start\nAssertionError\n")
+
+
 def test_exec_fork_pairing_ignores_non_exec_tool_result():
     ev = load_fixture("tool_result.json")
     ev["event"]["tool_name"] = "read_file"
@@ -377,6 +390,7 @@ def test_evaluate_empty_when_no_detection_applies():
         "proxy_token_exchanged.json",
         "proxy_run_started.json",
         "proxy_run_ended.json",
+        "compaction_via_model.json",
         # Detection 10 is not ported to the consumer: neither a USD
         # breach nor a model-time one, which carries `model_time` and
         # whose USD fields are not the breach, produces a match.

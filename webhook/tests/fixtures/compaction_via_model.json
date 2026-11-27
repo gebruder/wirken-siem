@@ -1,0 +1,20 @@
+{
+  "timestamp": "2026-11-27T12:00:05Z",
+  "session_id": "sess-1",
+  "seq": 12,
+  "kind": "compaction",
+  "trust": "compaction",
+  "level": "info",
+  "event": {
+    "kind": "compaction",
+    "spans": [],
+    "extracts": {"summary": "the earlier turns listed the files"},
+    "via_model": true,
+    "agent_id": "default",
+    "provider": "ollama",
+    "model": "qwen3.5:9b"
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

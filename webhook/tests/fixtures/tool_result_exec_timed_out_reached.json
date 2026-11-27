@@ -1,0 +1,27 @@
+{
+  "timestamp": "2026-11-27T12:00:02Z",
+  "session_id": "sess-1",
+  "seq": 8,
+  "kind": "tool_result",
+  "trust": "tool",
+  "event": {
+    "kind": "tool_result",
+    "call_id": "call-abc",
+    "tool_name": "exec",
+    "output": "start\nAssertionError\n",
+    "success": false,
+    "agent_id": "default",
+    "adapter_id": "slack",
+    "sender_id": "U12345",
+    "sandbox": {
+      "mode": "exec_only",
+      "runtime": "docker",
+      "container_id": "c1",
+      "timed_out": true,
+      "reached": true
+    }
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}
