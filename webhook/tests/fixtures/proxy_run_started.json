@@ -1,0 +1,24 @@
+{
+  "timestamp": "2026-11-27T00:00:00Z",
+  "session_id": "proxy-run1",
+  "seq": 1,
+  "kind": "proxy_run_started",
+  "trust": "system",
+  "level": "info",
+  "event": {
+    "kind": "proxy_run_started",
+    "token_id": "run1",
+    "image": "python:3.12-slim",
+    "image_id": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "runtime": "docker",
+    "container_id": "c1",
+    "command": ["python3", "/mnt/ro/client/client.py"],
+    "mounts": ["/srv/work:/workspace:rw", "/srv/client:/mnt/ro/client:ro"],
+    "memory_bytes": 4294967296,
+    "pids": 1024,
+    "nano_cpus": 2000000000
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

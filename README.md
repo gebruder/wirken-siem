@@ -56,6 +56,7 @@ at all.
 | 2.0.x  | Twelve typed variants: `llm_request_failed`; the adapter lifecycle events `adapter_connect`, `adapter_disconnect`, `adapter_restart` and `adapter_restart_abandoned`; the MCP server lifecycle events `mcp_server_sandboxed`, `mcp_server_unsandboxed`, `mcp_server_exited`, `mcp_server_restart` and `mcp_server_restart_abandoned`; `mcp_credential_refetched`; and `leak_refused`. `mcp_server` on `SandboxEgressVerdict`. A level on every typed row. The `connection.panic` legacy action. Sequence numbers are never reused after a rewind. No 2.x binary writes the `wasm_skill_call` `Action` label. |
 | 2.2.x  | `request_bytes` and `purpose` on `LlmRequest`. Compaction summary and tool-call probe model calls are recorded as `llm_request` / `llm_response` pairs. |
 | 2.3.x  | The `binary_installed` typed variant. `build` on the `SessionStart` chain head. A `{version, commit, dirty}` detail on the `gateway.start` legacy row. |
+| 3.6.x  | 3.6.0 changes no row. From 3.6.1: three typed variants, `proxy_token_exchanged`, `proxy_run_started` and `proxy_run_ended`. Optional `exchanged_for` on `mcp_credential_injected`. Two `reason` values on `proxy_tool_refused`, `exchange_required` and `exchange_failed`; `record_failed` there also covers a `proxy_token_exchanged` row that could not be written. The `reason` `provider_tool` on `proxy_refused`. `sandbox_egress_verdict` on a run's lane `proxy-<token id>`, with `agent_id` `proxy-run` and `sender_id` `proxy-token:<token id>`. |
 | 3.5.x  | Ten typed variants: `child_opened`, `mcp_credential_injected`, `mcp_inject_refused`, `proxy_request`, `proxy_response`, `proxy_refused` and `proxy_archive_redacted`; from 3.5.1 `proxy_tools_listed`, `proxy_tool_call` and `proxy_tool_refused`. Optional `step` on `assistant_tool_calls`, `llm_request` and `llm_response`. Optional `estimated_cost_usd_micros` and `reported` on `llm_response`. `secrets_injected` and optional `inject_host` on `mcp_server_sandboxed`. The `approved_via` kind `grant`, with `grant`. The `reason` `injected_host` on `sandbox_egress_verdict`. The lanes `gateway-proxy`, `proxy-<token id>` and `proxy-<token id>-<label>`. From 3.5.2: optional `identity` (`issuer`, `grant_set?`, `jti?`, `subject_hash?`, `subject?`) on `proxy_request`, `proxy_response`, `proxy_refused`, `proxy_tools_listed`, `proxy_tool_call` and `proxy_tool_refused` for a call made with a JWT; seven `reason` values on `proxy_refused`, `jwt_invalid`, `jwt_expired`, `jwt_wrong_issuer`, `jwt_wrong_audience`, `jwt_keys_unavailable`, `jwt_no_grant` and `jwt_ambiguous_grant`; the lane `proxy-<subject id>-<label>` and the tool-call sender `proxy-subject:<id>`. |
 | 3.4.x  | No new variant. Optional `stop_reason` and `stop_reason_raw` on `llm_response`. Optional `model_time` on `budget_exceeded`. Optional `limits` on the `sandbox` of a `tool_result` for an `exec`. The input cost on `llm_response` now prices prompt-cache writes and reads. |
 | 3.3.x  | Two typed variants: `exec_runtime_at_start` and `exec_runtime_unavailable`. The `denied_reason` kind `non_global_address`, with `address`, on `skill_permission_denied`. Optional `reasoning` on `assistant_tool_calls`. The `denial_reason` value `arguments too long to show for approval`. |
@@ -187,6 +188,10 @@ consume `McpEntryRefused`, `HookDispatched`, and
 - `ProxyToolsListed`, `ProxyToolCall`, `ProxyToolRefused` (3.5.1, a
   proxy client at the MCP endpoint: the tools it was shown, one call it
   made, and a request refused)
+- `ProxyTokenExchanged` (3.6.1, a JWT caller's token exchanged at the
+  identity provider for a token of an MCP server's audience)
+- `ProxyRunStarted`, `ProxyRunEnded` (3.6.1, a client `wirken proxy run`
+  started in a container, and how it ended)
 - `UpdateRefused` (3.0.0, `wirken update` refused inside a Wirken
   `exec`, or a rollback a migrated vault would break)
 - `McpCredentialRefreshDiscarded` (3.0.0, a refreshed OAuth credential
@@ -423,11 +428,17 @@ every variant below carries an `agent_id` and a 1.3.x-typed
 | `ExecRuntimeAtStart`   | `mode` (`off` / `exec_only` / `gvisor`), `runtime?`, `available`, `reason?`, `sidecar_runtime?` | (none here; reserved) |
 | `ExecRuntimeUnavailable` | `mode`, `runtime?`, `reason`, `agent_id`, `adapter_id?`, `sender_id?` | (none here; reserved) |
 | `ChildOpened`          | `agent_id`, `step?`, `tools[]`, `servers[]?` (`{name, status}`), `key_source?`, `model?`, `refused?` | (none here; reserved) |
-| `McpCredentialInjected` | `agent_id`, `server_name`, `credential`, `host`, `method`, `path` | (none here; reserved) |
+| `McpCredentialInjected` | `agent_id`, `server_name`, `credential`, `host`, `method`, `path`, `exchanged_for?` | (none here; reserved) |
 | `McpInjectRefused`     | `agent_id`, `server_name`, `host`, `method`, `path`, `reason` (`unmapped_path` / `path_shape` / `malformed` / `resolution_failed` / `credential_unavailable` / `credential_in_response` / `record_failed`) | (none here; reserved) |
 | `ProxyRequest`         | `request_id`, `token_id`, `token_name`, `upstream`, `provider`, `model`, `shape` (`openai_chat` / `anthropic_messages`), `stream`, `request_sha256`, `request_bytes`, `credential_id?`, `archived?`, `identity?` | (none here; reserved) |
 | `ProxyResponse`        | `request_id`, `token_id`, `status`, `latency_ms`, `input_tokens?`, `output_tokens?`, `cache_read_input_tokens?`, `cache_creation_input_tokens?`, `total_cost_usd_micros?`, `response_sha256`, `response_bytes`, `complete`, `archived?`, `identity?` | (none here; reserved) |
-| `ProxyRefused`         | `token_id?`, `shape?`, `model?`, `reason` (`unknown_token` / `revoked_token` / `malformed` / `shape_not_spoken` / `model_not_allowed` / `budget_exceeded` / `leak_refused` / `credential_refused` / `record_failed` / `archive_failed` / `jwt_invalid` / `jwt_expired` / `jwt_wrong_issuer` / `jwt_wrong_audience` / `jwt_keys_unavailable` / `jwt_no_grant` / `jwt_ambiguous_grant`), `identity?` | (none here; reserved) |
+| `ProxyRefused`         | `token_id?`, `shape?`, `model?`, `reason` (`unknown_token` / `revoked_token` / `malformed` / `shape_not_spoken` / `model_not_allowed` / `budget_exceeded` / `leak_refused` / `credential_refused` / `record_failed` / `archive_failed` / `jwt_invalid` / `jwt_expired` / `jwt_wrong_issuer` / `jwt_wrong_audience` / `jwt_keys_unavailable` / `jwt_no_grant` / `jwt_ambiguous_grant` / `provider_tool`), `identity?` | (none here; reserved) |
+| `ProxyToolsListed`     | `token_id`, `agent_id`, `mcp_session`, `servers[]`, `tools[]`, `tools_sha256`, `archived?`, `identity?` | (none here; reserved) |
+| `ProxyToolCall`        | `call_id`, `token_id`, `agent_id`, `mcp_session`, `tool`, `success`, `latency_ms`, `request_sha256`, `request_bytes`, `response_sha256`, `response_bytes`, `archived?`, `identity?` | (none here; reserved) |
+| `ProxyToolRefused`     | `token_id`, `agent_id?`, `mcp_session?`, `tool?`, `reason` (`no_mcp_grant` / `not_granted` / `definition_changed` / `malformed` / `unavailable` / `record_failed` / `archive_failed` / `exchange_required` / `exchange_failed`), `identity?` | (none here; reserved) |
+| `ProxyTokenExchanged`  | `token_id`, `agent_id`, `mcp_session`, `server`, `audience`, `expires_at`, `identity` | (none here; reserved) |
+| `ProxyRunStarted`      | `token_id`, `image`, `image_id?`, `image_digest?`, `runtime` (`docker` / `gvisor` / `host`), `container_id`, `command[]`, `mounts[]`, `egress_hosts[]`, `memory_bytes`, `pids`, `nano_cpus` | (none here; reserved) |
+| `ProxyRunEnded`        | `token_id`, `container_id`, `exit_code?`, `stopped?`, `duration_ms` | (none here; reserved) |
 | `ProxyArchiveRedacted` | `sha256`, `operator`, `reason`, `session?` | (none here; reserved) |
 | `UpdateRefused`        | `invocation` (`check` / `install` / `rollback`), `reason` (`inside_exec` / `vault_format`) | (none here; reserved) |
 | `McpCredentialRefreshDiscarded` | `credential`, `reason` (`removed` / `reauthorized` / `unreadable`) | (none here; reserved) |
@@ -599,6 +610,17 @@ subject's id, `u` and sixteen hex characters, its lane
 `proxy-<subject id>-<label>`, and `token_name` the grant set. A refused
 JWT is a `ProxyRefused` on `gateway-proxy` with a `jwt_*` reason, and
 carries `identity` only for `jwt_no_grant` and `jwt_ambiguous_grant`.
+From 3.6.1: `ProxyTokenExchanged` is on the caller's session lane, before
+the call reaches the gate, one per exchange; a call made with a token still
+held writes none, and neither token is on the row. An
+`McpCredentialInjected` with `exchanged_for` names the audience of the
+token set in place of the credential. `ProxyRunStarted` and
+`ProxyRunEnded` are on the run token's lane, `proxy-<token id>`, with the
+`SandboxEgressVerdict` of each request its client sent to its sidecar; on
+those verdicts `agent_id` is `proxy-run`, not an agent, and the sender is
+the token. A `ProxyRefused` with `provider_tool` was not sent: it asked the
+provider to act for the client. All five kinds are forwarded by default at
+`info`, with `proxy-token:<token id>` in the sender column.
 `ProxyRefused` with `reason` `budget_exceeded` is a proxy token's spend
 ceiling; it is not a `BudgetExceeded` row and detection 10 does not read
 it. `ChildOpened` is on the session of the turn, with the agent column

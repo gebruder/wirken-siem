@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-11-27T00:00:00Z",
+  "session_id": "proxy-u0f3a9c2e71b4d58a-work",
+  "seq": 4,
+  "kind": "proxy_token_exchanged",
+  "trust": "system",
+  "level": "info",
+  "event": {
+    "kind": "proxy_token_exchanged",
+    "token_id": "u0f3a9c2e71b4d58a",
+    "agent_id": "a1",
+    "mcp_session": "s1",
+    "server": "crm",
+    "audience": "crm-api",
+    "expires_at": "2026-11-27T00:05:00Z",
+    "identity": {
+      "issuer": "https://idp.example.com/realms/acme",
+      "grant_set": "engineers",
+      "subject_hash": "6f1ed002ab5595859014ebf0951522d9f0f1c5a3c2f3a8a1b4f1e6d7c8b9a0f1"
+    }
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}

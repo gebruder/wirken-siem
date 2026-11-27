@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-11-27T00:01:00Z",
+  "session_id": "proxy-run1",
+  "seq": 4,
+  "kind": "proxy_run_ended",
+  "trust": "system",
+  "level": "info",
+  "event": {
+    "kind": "proxy_run_ended",
+    "token_id": "run1",
+    "container_id": "c1",
+    "exit_code": 7,
+    "duration_ms": 5321
+  },
+  "service": "wirken",
+  "environment": "test",
+  "hostname": "h1"
+}
